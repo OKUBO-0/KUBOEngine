@@ -1,0 +1,26 @@
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.ipch
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.log
+*.tmp
+*.cache
+imgui.ini
+.env
+
+# Build output
+[Dd]ebug/
+[Rr]elease/
+[Xx]64/
+[Xx]86/
+bin/
+build/
+
+# Large local third-party binaries
+externals/assimp/lib/
