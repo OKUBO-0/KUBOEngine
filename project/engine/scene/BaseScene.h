@@ -1,6 +1,7 @@
 #pragma once
 
 class SceneManager;
+struct SceneServices;
 class BaseScene
 {
 public:
@@ -19,9 +20,15 @@ public:
 	virtual ~BaseScene() = default;
 
 	virtual void SetSceneManager(SceneManager* sceneManager) { sceneManager_ = sceneManager; }
+	virtual void SetServices(const SceneServices* services) { services_ = services; }
+
+protected:
+	SceneManager* GetSceneManager() const { return sceneManager_; }
+	const SceneServices& GetServices() const { return *services_; }
 
 private:
 	SceneManager* sceneManager_ = nullptr;
+	const SceneServices* services_ = nullptr;
 
 };
 

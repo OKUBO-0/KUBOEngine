@@ -12,7 +12,7 @@ public:
 	SkyBox() = default;
 	~SkyBox() ;
 
-	void Initialize(std::string textureFilePath);
+	void Initialize(SkyBoxCommon* skyBoxCommon, std::string textureFilePath);
 	void Update();
 	void Draw();
 	
@@ -23,6 +23,7 @@ public:
 private:
 	SrvManager* srvManager_ = nullptr;
 	DirectXCommon* dxCommon_ = nullptr;
+	SkyBoxCommon* skyBoxCommon_ = nullptr;
 
 	//トランスフォーム
 	//ModelTransform用のリソースを作る。Matrix4x4 1つ分のサイズを用意する

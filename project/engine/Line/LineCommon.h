@@ -18,6 +18,7 @@
 #include <d3d12.h>
 #include <Camera.h>
 #include <vector>
+class CameraManager;
 
 struct VertexDataLine
 {
@@ -40,11 +41,14 @@ struct CameraBufferforGpu {
 class LineCommon
 {
 public:
-	static LineCommon* GetInstance();
+	LineCommon() = default;
+	~LineCommon() = default;
+	LineCommon(const LineCommon&) = delete;
+	LineCommon& operator=(const LineCommon&) = delete;
 	/// <summary>
 	/// 初期化
 	/// </summary>
-	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, CameraManager* cameraManager);
 	//終了
 	void Finalize();
 	//共通描画設定
@@ -61,17 +65,10 @@ public:
 	//SrvMnager
 	SrvManager* GetSrvmanager()const { return srvManager_; }
 
-
 private:
-	LineCommon() = default;
-	~LineCommon() = default;
-	LineCommon(const LineCommon&) = delete;
-	LineCommon& operator=(const LineCommon&) = delete;
-private:
-	//インスタンス
-	static LineCommon* instance_;
 	DirectXCommon* dxCommon_;
 	SrvManager* srvManager_;
+	CameraManager* cameraManager_ = nullptr;
 	std::unique_ptr<GraphicsPipeline> graphicsPipeline_;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;

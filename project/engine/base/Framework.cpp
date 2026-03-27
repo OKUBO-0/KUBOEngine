@@ -10,80 +10,119 @@ void Framework::Initialize()
 
 	winApp = std::make_unique<WinApp>();
 	winApp->Initialize();
+	engineContext_.winApp = winApp.get();
 	// DirectX初期化
 
 	dxCommon = std::make_unique<DirectXCommon>();
 	dxCommon->Initialize(winApp.get());
+	engineContext_.dxCommon = dxCommon.get();
 	// SRVマネージャの初期化
 	srvManager = std::make_unique<SrvManager>();
 	srvManager->Initialize(dxCommon.get());
+	engineContext_.srvManager = srvManager.get();
 	// オフスクリーンレンダーマネージャの初期化
 	ofscreenRenderManager = std::make_unique<OfscreenRenderManager>();
 	ofscreenRenderManager->Initialize(dxCommon.get(), srvManager.get());
+	engineContext_.ofscreenRenderManager = ofscreenRenderManager.get();
 
 	//テクスチャマネージャの初期化
-	TextureManager::GetInstance()->Initialize(dxCommon.get(), srvManager.get());
+	textureManager = std::make_unique<TextureManager>();
+	textureManager->Initialize(dxCommon.get(), srvManager.get());
+	engineContext_.textureManager = textureManager.get();
 	//Input初期化
-	Input::GetInstance()->Initialize(winApp.get());
+	input = std::make_unique<Input>();
+	input->Initialize(winApp.get());
+	engineContext_.input = input.get();
 	//Audio初期化
-	Audio::GetInstance()->Initialize();
-	//パーティクル
-	ParticleMnager::GetInstance()->Initialize(dxCommon.get(), srvManager.get());
-	//camera初期化
-	CameraManager::GetInstance()->Initialize();
+	audio = std::make_unique<Audio>();
+	audio->Initialize();
+	engineContext_.audio = audio.get();
+	cameraManager = std::make_unique<CameraManager>();
+	cameraManager->Initialize();
+	engineContext_.cameraManager = cameraManager.get();
+	modelManager = std::make_unique<ModelManager>();
+	modelManager->Initialize(dxCommon.get(), srvManager.get(), engineContext_.textureManager);
+	engineContext_.modelManager = modelManager.get();
+	particleManager = std::make_unique<ParticleMnager>();
+	particleManager->Initialize(dxCommon.get(), srvManager.get(), engineContext_.cameraManager, engineContext_.modelManager, engineContext_.textureManager);
+	engineContext_.particleManager = particleManager.get();
 
 	//スプライト共通部分の初期化
-	SpriteCommon::GetInstance()->Initialize(dxCommon.get());
-
-	//3Dモデルマネージャの初期化
-	ModelManager::GetInstans()->Initialize(dxCommon.get(), srvManager.get());
+	spriteCommon = std::make_unique<SpriteCommon>();
+	spriteCommon->Initialize(dxCommon.get());
+	spriteCommon->SetCameraManager(engineContext_.cameraManager);
+	spriteCommon->SetTextureManager(engineContext_.textureManager);
+	engineContext_.spriteCommon = spriteCommon.get();
 
 	//3Dオブジェクト共通部の初期化
-	Object3DCommon::GetInstance()->Initialize(dxCommon.get(),srvManager.get());
+	object3DCommon = std::make_unique<Object3DCommon>();
+	object3DCommon->Initialize(dxCommon.get(),srvManager.get(), engineContext_.cameraManager, engineContext_.modelManager, engineContext_.textureManager);
+	engineContext_.object3DCommon = object3DCommon.get();
 
 	// Line初期化
-	LineCommon::GetInstance()->Initialize(dxCommon.get(), srvManager.get());
+	lineCommon = std::make_unique<LineCommon>();
+	lineCommon->Initialize(dxCommon.get(), srvManager.get(), engineContext_.cameraManager);
+	engineContext_.lineCommon = lineCommon.get();
 
-	SkyBoxCommon::GetInstance()->Initialize(dxCommon.get(), srvManager.get());
+	skyBoxCommon = std::make_unique<SkyBoxCommon>();
+	skyBoxCommon->Initialize(dxCommon.get(), srvManager.get(), engineContext_.cameraManager, engineContext_.textureManager);
+	engineContext_.skyBoxCommon = skyBoxCommon.get();
+	sceneManager = std::make_unique<SceneManager>();
+	engineContext_.sceneManager = sceneManager.get();
 
 #ifdef _DEBUG
 	// ImGuiマネージャの初期化
 	imGuiMnager = std::make_unique<ImGuiManager>();
 	imGuiMnager->Initialize(dxCommon.get(), winApp.get());
+	engineContext_.imGuiManager = imGuiMnager.get();
 #endif // _DEBUG
 }
 
 void Framework::Finalize()
 {
 #ifdef _DEBUG
-	imGuiMnager->Finalize();
+	if (engineContext_.imGuiManager) {
+		engineContext_.imGuiManager->Finalize();
+	}
 #endif // DEBUG
 
 	// Audio解放
-	Audio::GetInstance()->Finalize();
+	engineContext_.audio->Finalize();
 	//WindowsAPI終了処理
-	winApp->Finalize();
+	engineContext_.winApp->Finalize();
 	//WindowsAPI解放
-	TextureManager::GetInstance()->Finalize();
+	engineContext_.textureManager->Finalize();
 	//DirectXCommon解放
-	ModelManager::GetInstans()->Finalize();
+	engineContext_.modelManager->Finalize();
 	//カメラの解放
-	CameraManager::GetInstance()->Finalize();
+	engineContext_.cameraManager->Finalize();
 	//パーティクルの解放
-	ParticleMnager::GetInstance()->Finalize();
-
-	SkyBoxCommon::GetInstance()->Finalize();
+	engineContext_.particleManager->Finalize();
 
 	// ユニークポインタは自動的に解放されるため、deleteは不要
 #ifdef _DEBUG
 	imGuiMnager.reset();
+	engineContext_.imGuiManager = nullptr;
 #endif // _DEBUG
 
-	Input::GetInstance()->Finalize();
-	SpriteCommon::GetInstance()->Finalize();
-	Object3DCommon::GetInstance()->Finalize();
-	SceneManager::GetInstance()->Finalize();
-	LineCommon::GetInstance()->Finalize();
+	engineContext_.input->Finalize();
+	engineContext_.spriteCommon->Finalize();
+	engineContext_.object3DCommon->Finalize();
+	engineContext_.sceneManager->Finalize();
+	engineContext_.lineCommon->Finalize();
+	engineContext_.skyBoxCommon->Finalize();
+	skyBoxCommon.reset();
+	lineCommon.reset();
+	object3DCommon.reset();
+	spriteCommon.reset();
+	particleManager.reset();
+	modelManager.reset();
+	cameraManager.reset();
+	audio.reset();
+	input.reset();
+	textureManager.reset();
+	sceneManager.reset();
+	engineContext_ = {};
 }
 
 void Framework::Update()
@@ -94,10 +133,10 @@ void Framework::Update()
 		endRequst_ = true;
 	}
 
-	Input::GetInstance()->Update();
-	ParticleMnager::GetInstance()->Update();
-	SceneManager::GetInstance()->Update();
-	LineCommon::GetInstance()->Update();
+	engineContext_.input->Update();
+	engineContext_.particleManager->Update();
+	engineContext_.sceneManager->Update();
+	engineContext_.lineCommon->Update();
 }
 
 void Framework::Run()

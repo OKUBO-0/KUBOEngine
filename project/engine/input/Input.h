@@ -14,12 +14,6 @@ template <class T>using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 class Input
 {
-	static Input* instance;
-	Input() = default;
-	~Input() = default;
-	Input(Input&) = default;
-	Input& operator=(Input&) = delete;
-
 public: // インナークラス
 	struct MouseMove {
 		LONG lX;
@@ -27,8 +21,10 @@ public: // インナークラス
 		LONG lZ;
 	};
 public:
-	//シングルトンインスタンスの取得
-	static Input* GetInstance();
+	Input() = default;
+	~Input() = default;
+	Input(const Input&) = delete;
+	Input& operator=(const Input&) = delete;
 	//終了
 	void Finalize();
 

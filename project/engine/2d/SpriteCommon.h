@@ -1,11 +1,16 @@
 #pragma once
 #include "DirectXCommon.h"
 #include "GraphicsPipeline.h"
+class CameraManager;
+class TextureManager;
 
 class SpriteCommon
 {
 public:
-    static SpriteCommon* GetInstance();
+    SpriteCommon() = default;
+    ~SpriteCommon() = default;
+    SpriteCommon(const SpriteCommon&) = delete;
+    SpriteCommon& operator=(const SpriteCommon&) = delete;
 
     /// 初期化（DX共通とパイプライン生成）
     void Initialize(DirectXCommon* dxCommon);
@@ -17,9 +22,14 @@ public:
     void CommonDraw();
 
     DirectXCommon* GetDxCommon() const { return dxCommon_; }
+    CameraManager* GetCameraManager() const { return cameraManager_; }
+    TextureManager* GetTextureManager() const { return textureManager_; }
+    void SetCameraManager(CameraManager* cameraManager) { cameraManager_ = cameraManager; }
+    void SetTextureManager(TextureManager* textureManager) { textureManager_ = textureManager; }
 
 private:
-    static SpriteCommon* instance_;
     DirectXCommon* dxCommon_ = nullptr; // DX共通クラス参照
+    CameraManager* cameraManager_ = nullptr;
+    TextureManager* textureManager_ = nullptr;
     std::unique_ptr<GraphicsPipeline> graphicsPipeline_; // グラフィックスパイプライン
 };

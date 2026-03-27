@@ -13,7 +13,8 @@ public:
 		const float lifetime,
 		const float currentTime,
 		const uint32_t count,
-		const std::string& name
+		const std::string& name,
+		ParticleMnager* particleManager
 	
 	);
 
@@ -51,7 +52,7 @@ private:
 	//名前
 	std::string name_;
 	//particleタイプ
-	
+	ParticleMnager* particleManager_ = nullptr;
 
 
 };

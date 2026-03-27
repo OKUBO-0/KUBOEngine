@@ -7,6 +7,9 @@
 #include "GraphicsPipeline.h"
 #include "IParticleBehavior.h"
 #include <memory>
+class CameraManager;
+class ModelManager;
+class TextureManager;
 
 
 
@@ -68,11 +71,8 @@ class ParticleMnager
 
 	};
 public:
-
-	static ParticleMnager* GetInstance();
-	
-private:
 	// コンストラクタをプライベートにする
+public:
 	ParticleMnager() = default;
 	~ParticleMnager() = default;
 	// コピーコンストラクタと代入演算子を削除する
@@ -83,7 +83,7 @@ private:
 public:
 
 	//初期化
-	void Initialize(DirectXCommon* dxcommn,SrvManager*srvmaneger);
+	void Initialize(DirectXCommon* dxcommn,SrvManager*srvmaneger, CameraManager* cameraManager, ModelManager* modelManager, TextureManager* textureManager);
 
 
 
@@ -115,10 +115,11 @@ public:
 private:
 
 
-	//インスタンス
-	static ParticleMnager* instance_;
 	DirectXCommon* dxCommon_=nullptr;
 	SrvManager* srvManager_ = nullptr;
+	CameraManager* cameraManager_ = nullptr;
+	ModelManager* modelManager_ = nullptr;
+	TextureManager* textureManager_ = nullptr;
 
 
 	std::unique_ptr<GraphicsPipeline> graphicsPipeline_;

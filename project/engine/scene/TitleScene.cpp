@@ -3,6 +3,7 @@
 #include "SpriteCommon.h"
 #include "Input.h"
 #include "SceneManager.h"
+#include "SceneServices.h"
 #include "ImGuiManager.h"
 #include <imgui.h>
 
@@ -20,10 +21,8 @@ void TitleScene::Finalize()
 
 void TitleScene::Update()
 {
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
-
-		
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	if (GetServices().input->TriggerKey(DIK_SPACE)) {
+		GetSceneManager()->ChangeScene("GAMEPLAY");
 		
 	}
 
@@ -32,7 +31,7 @@ void TitleScene::Update()
 		ImGui::Text("titleScene %d");
 		if (ImGui::Button("gamePlayScene"))
 		{
-			SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+			GetSceneManager()->ChangeScene("GAMEPLAY");
 		}
 		
 
@@ -44,9 +43,9 @@ void TitleScene::Update()
 void TitleScene::Draw()
 {
 	//3dオブジェクトの描画準備。3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
-	Object3DCommon::GetInstance()->CommonDraw();
+	GetServices().object3DCommon->CommonDraw();
 
 	//Spriteの描画準備。spriteの描画に共通のグラフィックスコマンドを積む
-	SpriteCommon::GetInstance()->CommonDraw();
+	GetServices().spriteCommon->CommonDraw();
 
 }

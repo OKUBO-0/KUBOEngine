@@ -6,8 +6,9 @@
 #include <imgui.h>
 #include "Input.h"
 #include "TitleScene.h"
+#include "SceneManager.h"
+#include "SceneServices.h"
 #include "CameraManager.h"
-#include "ParticleMnager.h"
 #include <Logger.h>
 #include "LineCommon.h"
 #include "AttackBehavior.h"
@@ -18,16 +19,16 @@ void GamePlayScene::Initialize()
 	// メインカメラ生成と登録
 	camera1 = std::make_unique<Camera>();
 	camera1->SetTranslate({ 0,0,-10 }); // カメラ位置
-	CameraManager::GetInstance()->AddCamera("maincam", camera1.get());
+	GetServices().cameraManager->AddCamera("maincam", camera1.get());
 
 	// サブカメラ生成と登録
 	camera2 = std::make_unique<Camera>();
 	camera2->SetTranslate(Vector3(0, 6.0f, -20.0f)); // カメラ位置
 	camera2->SetRotate({ 0.35f,0.0f,0.0f });         // カメラ角度
-	CameraManager::GetInstance()->AddCamera("subcam", camera2.get());
+	GetServices().cameraManager->AddCamera("subcam", camera2.get());
 
 	// デフォルトカメラをメインに設定
-	CameraManager::GetInstance()->SetActiveCamera("maincam");
+	GetServices().cameraManager->SetActiveCamera("maincam");
 
 	// ロード処理全体の時間を計測
 	auto start = std::chrono::high_resolution_clock::now();
@@ -42,11 +43,11 @@ void GamePlayScene::Initialize()
 
 	// スカイボックス初期化
 	skyBox = std::make_unique<SkyBox>();
-	skyBox->Initialize("Resources/test.dds");
+	skyBox->Initialize(GetServices().skyBoxCommon, "Resources/test.dds");
 
 	// プレイヤーモデル初期化
     object3D = std::make_unique<Object3D>();
-    object3D->Initialize(Object3DCommon::GetInstance());
+    object3D->Initialize(GetServices().object3DCommon);
     object3D->SetModel("walk.gltf");
     object3D->SetLighting(true);
     object3D->SetPointLightEnable(false);
@@ -56,7 +57,7 @@ void GamePlayScene::Initialize()
 
 	// 地形モデル初期化
     terrain = std::make_unique<Object3D>();
-    terrain->Initialize(Object3DCommon::GetInstance());
+    terrain->Initialize(GetServices().object3DCommon);
     terrain->SetModel("terrain.obj");
     terrain->SetTransform({ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f} ,{0.0f,-1.0f,0.0f} });
     terrain->SetLighting(true);
@@ -65,19 +66,20 @@ void GamePlayScene::Initialize()
 
 	// スプライト初期化
     sprite = std::make_unique<Sprite>();
-    sprite->Initialize(SpriteCommon::GetInstance(), "Resources/uvChecker.png");
+    sprite->Initialize(GetServices().spriteCommon, "Resources/uvChecker.png");
 
 	light = true;
 
 	// パーティクル初期化
-	ParticleMnager::GetInstance()->CreateParticleGroup("Particle1", "Resources/gradationLine.png", VerticesType::Cylinder, std::make_unique<MagicCircleBehavior>());
-	ParticleMnager::GetInstance()->CreateParticleGroup("Particle2", "Resources/gradationLine.png", VerticesType::Ring, std::make_unique<AttackBehavior>());
+	GetServices().particleManager->CreateParticleGroup("Particle1", "Resources/gradationLine.png", VerticesType::Cylinder, std::make_unique<MagicCircleBehavior>());
+	GetServices().particleManager->CreateParticleGroup("Particle2", "Resources/gradationLine.png", VerticesType::Ring, std::make_unique<AttackBehavior>());
 
-	particleEmitter = std::make_unique<ParticleEmitter>(Vector3(0, 0, 0), 1.0f, 0.0f, 10, "Particle2");
-	particleEmitter2 = std::make_unique<ParticleEmitter>(Vector3(0, 0, 0), 1.0f, 0.0f, 1, "Particle1");
+	particleEmitter = std::make_unique<ParticleEmitter>(Vector3(0, 0, 0), 1.0f, 0.0f, 10, "Particle2", GetServices().particleManager);
+	particleEmitter2 = std::make_unique<ParticleEmitter>(Vector3(0, 0, 0), 1.0f, 0.0f, 1, "Particle1", GetServices().particleManager);
 
 	// 線描画用
 	line = std::make_unique<Line>();
+	line->Initialize(GetServices().lineCommon);
 	startline = { 0,0,0 };
 	endline = { 1,0,0 };
 }
@@ -85,9 +87,8 @@ void GamePlayScene::Initialize()
 void GamePlayScene::Finalize()
 {
 	// カメラ破棄
-	CameraManager::GetInstance()->RemoveCamera("maincam");
-	CameraManager::GetInstance()->RemoveCamera("subcam");
-	CameraManager::GetInstance()->Finalize();
+	GetServices().cameraManager->RemoveCamera("maincam");
+	GetServices().cameraManager->RemoveCamera("subcam");
 }
 
 void GamePlayScene::Update()
@@ -98,8 +99,8 @@ void GamePlayScene::Update()
 	float velocity = 0.05f;
 
 	// ゲームパッド入力による移動
-	float lx = Input::GetInstance()->GetGamePadStickX();
-	float ly = Input::GetInstance()->GetGamePadStickY();
+	float lx = GetServices().input->GetGamePadStickX();
+	float ly = GetServices().input->GetGamePadStickY();
 
 	Vector3 translate = object3D->GetTransform().translate;
 	translate.x += lx * velocity;
@@ -107,28 +108,28 @@ void GamePlayScene::Update()
 	object3D->SetTranslate(translate);
 
 	// LTで縮小 / RTで拡大
-	if (Input::GetInstance()->GetGamePadTrigger()) {
+	if (GetServices().input->GetGamePadTrigger()) {
 		object3D->SetScale(object3D->GetTransform().scale + Vector3(-0.01f, -0.01f, -0.01f));
 	}
-	if (Input::GetInstance()->GetGamePadTrigger(1)) {
+	if (GetServices().input->GetGamePadTrigger(1)) {
 		object3D->SetScale(object3D->GetTransform().scale + Vector3(0.01f, 0.01f, 0.01f));
 	}
 
 	// LB/RBで回転
-	if (Input::GetInstance()->PushGamePadButton(XINPUT_GAMEPAD_LEFT_SHOULDER)) {
+	if (GetServices().input->PushGamePadButton(XINPUT_GAMEPAD_LEFT_SHOULDER)) {
 		object3D->SetRotate(object3D->GetTransform().rotate + Vector3(0.0f, 0.01f, 0.0f));
 	}
-	if (Input::GetInstance()->PushGamePadButton(XINPUT_GAMEPAD_RIGHT_SHOULDER)) {
+	if (GetServices().input->PushGamePadButton(XINPUT_GAMEPAD_RIGHT_SHOULDER)) {
 		object3D->SetRotate(object3D->GetTransform().rotate + Vector3(0.0f, -0.01f, 0.0f));
 	}
 
 	// Aボタンでフラグ切り替え
-	if (Input::GetInstance()->TriggerGamePadButton(XINPUT_GAMEPAD_A)) {
+	if (GetServices().input->TriggerGamePadButton(XINPUT_GAMEPAD_A)) {
 		number = !number;
 	}
 
 	// カメラ更新
-	CameraManager::GetInstance()->GetActiveCamera()->Update();
+	GetServices().cameraManager->GetActiveCamera()->Update();
 
 	// モデル更新
 	object3D->Update();
@@ -153,10 +154,10 @@ void GamePlayScene::Update()
     //==============================
     if (ImGui::CollapsingHeader("Scene Control", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::Button("GameClearScene")) {
-            SceneManager::GetInstance()->ChangeScene("GAMECLEAR");
+            GetSceneManager()->ChangeScene("GAMECLEAR");
         }
         if (ImGui::Button("GameOverScene")) {
-            SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+            GetSceneManager()->ChangeScene("GAMEOVER");
         }
     }
 
@@ -166,18 +167,18 @@ void GamePlayScene::Update()
     if (ImGui::CollapsingHeader("Camera Control", ImGuiTreeNodeFlags_DefaultOpen)) {
 
         if (ImGui::Button("Switch to Main Camera")) {
-            CameraManager::GetInstance()->SetActiveCamera("maincam");
+            GetServices().cameraManager->SetActiveCamera("maincam");
         }
         if (ImGui::Button("Switch to Sub Camera")) {
-            CameraManager::GetInstance()->SetActiveCamera("subcam");
+            GetServices().cameraManager->SetActiveCamera("subcam");
         }
 
-        EulerTransform cameraTransform = CameraManager::GetInstance()->GetActiveCamera()->GetTransform();
+        EulerTransform cameraTransform = GetServices().cameraManager->GetActiveCamera()->GetTransform();
         if (ImGui::DragFloat3("Camera Position", &cameraTransform.translate.x, 0.01f)) {
-            CameraManager::GetInstance()->GetActiveCamera()->SetTranslate(cameraTransform.translate);
+            GetServices().cameraManager->GetActiveCamera()->SetTranslate(cameraTransform.translate);
         }
         if (ImGui::DragFloat3("Camera Rotation", &cameraTransform.rotate.x, 0.01f)) {
-            CameraManager::GetInstance()->GetActiveCamera()->SetRotate(cameraTransform.rotate);
+            GetServices().cameraManager->GetActiveCamera()->SetRotate(cameraTransform.rotate);
         }
     }
 
@@ -393,10 +394,10 @@ void GamePlayScene::Draw()
 {
 #pragma region 3Dオブジェクト描画
 	// 3Dオブジェクト描画
-	Object3DCommon::GetInstance()->CommonDraw();
+	GetServices().object3DCommon->CommonDraw();
 	terrain->Draw();
 
-	Object3DCommon::GetInstance()->SkinNingCommonDraw();
+	GetServices().object3DCommon->SkinNingCommonDraw();
 	object3D->DrawSkinning();
 
 	//ParticleMnager::GetInstance()->Draw();
@@ -408,7 +409,7 @@ void GamePlayScene::Draw()
 
 #pragma region スプライト描画
 	// スプライト描画
-	SpriteCommon::GetInstance()->CommonDraw();
+	GetServices().spriteCommon->CommonDraw();
 	// sprite->Draw();
 #pragma endregion
 }
@@ -416,15 +417,15 @@ void GamePlayScene::Draw()
 void GamePlayScene::LoadModel()
 {
 	// 必要なモデルを事前ロード
-	ModelManager::GetInstans()->LoadModel("axis.obj");
-	ModelManager::GetInstans()->LoadModel("plane.gltf");
-	ModelManager::GetInstans()->LoadModel("sphere.obj");
-	ModelManager::GetInstans()->LoadModel("terrain.obj");
-	ModelManager::GetInstans()->LoadModel("animationfly.gltf");
-	ModelManager::GetInstans()->LoadModel("sphere.gltf");
-	ModelManager::GetInstans()->LoadModel("player.gltf");
-	ModelManager::GetInstans()->LoadModel("walk.gltf");
-	ModelManager::GetInstans()->LoadModel("testanimation.gltf");
+	GetServices().modelManager->LoadModel("axis.obj");
+	GetServices().modelManager->LoadModel("plane.gltf");
+	GetServices().modelManager->LoadModel("sphere.obj");
+	GetServices().modelManager->LoadModel("terrain.obj");
+	GetServices().modelManager->LoadModel("animationfly.gltf");
+	GetServices().modelManager->LoadModel("sphere.gltf");
+	GetServices().modelManager->LoadModel("player.gltf");
+	GetServices().modelManager->LoadModel("walk.gltf");
+	GetServices().modelManager->LoadModel("testanimation.gltf");
 }
 
 void GamePlayScene::Loadparticle()
@@ -435,5 +436,5 @@ void GamePlayScene::Loadparticle()
 void GamePlayScene::LoadAudio()
 {
 	// BGM読み込み（現在は wav のみ対応）
-	sampleSoundData = Audio::GetInstance()->SoundLoadWave("Resources/gamePlayBGM.wav");
+	sampleSoundData = GetServices().audio->SoundLoadWave("Resources/gamePlayBGM.wav");
 }

@@ -5,15 +5,12 @@
 #include <memory>
 class CameraManager
 {
-	static CameraManager* instance;
+public:
 	CameraManager() = default;
 	~CameraManager() = default;
-	CameraManager(CameraManager&) = default;
+	CameraManager(CameraManager&) = delete;
 	CameraManager& operator=(CameraManager&) = delete;
 
-public:
-	//シングルトンインスタンスの取得
-	static CameraManager* GetInstance();
 	//終了
 	void Finalize();
 

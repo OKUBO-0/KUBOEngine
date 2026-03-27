@@ -5,21 +5,18 @@
 #include <cmath>
 #include <iostream>
 
-Input* Input::instance = nullptr;
-
-Input* Input::GetInstance()
-{
-	if (instance == nullptr) {
-		instance = new Input;
-	}
-	return instance;
-}
-
 void Input::Finalize()
 {
-	delete instance;
-	instance = nullptr;
-
+	keyboard.Reset();
+	devMouse_.Reset();
+	directInput.Reset();
+	winApp_ = nullptr;
+	mouse = {};
+	preMouse = {};
+	mousePos = {};
+	state_ = {};
+	prevState_ = {};
+	gamepadConnected_ = false;
 }
 
 void Input::Initialize(WinApp* winApp)

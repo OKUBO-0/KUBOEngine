@@ -1,16 +1,6 @@
 #include "SpriteCommon.h"
 #include "Logger.h"
 
-SpriteCommon* SpriteCommon::instance_ = nullptr;
-
-SpriteCommon* SpriteCommon::GetInstance()
-{
-    if (instance_ == nullptr) {
-        instance_ = new SpriteCommon();
-    }
-    return instance_;
-}
-
 void SpriteCommon::Initialize(DirectXCommon* dxCommon)
 {
     dxCommon_ = dxCommon;
@@ -22,8 +12,10 @@ void SpriteCommon::Initialize(DirectXCommon* dxCommon)
 
 void SpriteCommon::Finalize()
 {
-    delete instance_;
-    instance_ = nullptr;
+    graphicsPipeline_.reset();
+    dxCommon_ = nullptr;
+    cameraManager_ = nullptr;
+    textureManager_ = nullptr;
 }
 
 void SpriteCommon::CommonDraw()

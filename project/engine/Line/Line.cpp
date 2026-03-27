@@ -9,7 +9,7 @@
 void Line::Draw(const Vector3& start, const Vector3& end, const Vector4& color)
 {
 
-	LineCommon::GetInstance()->DrawLine(start, end, color);
+	lineCommon_->DrawLine(start, end, color);
 
 
 }
@@ -28,22 +28,22 @@ void Line::DrawAABB(const Vector3& min, const Vector3& max, const Vector4& color
 	};
 
 	// 前面
-	LineCommon::GetInstance()->DrawLine(p[0], p[1], color);
-	LineCommon::GetInstance()->DrawLine(p[1], p[2], color);
-	LineCommon::GetInstance()->DrawLine(p[2], p[3], color);
-	LineCommon::GetInstance()->DrawLine(p[3], p[0], color);
+	lineCommon_->DrawLine(p[0], p[1], color);
+	lineCommon_->DrawLine(p[1], p[2], color);
+	lineCommon_->DrawLine(p[2], p[3], color);
+	lineCommon_->DrawLine(p[3], p[0], color);
 
 	// 背面
-	LineCommon::GetInstance()->DrawLine(p[4], p[5], color);
-	LineCommon::GetInstance()->DrawLine(p[5], p[6], color);
-	LineCommon::GetInstance()->DrawLine(p[6], p[7], color);
-	LineCommon::GetInstance()->DrawLine(p[7], p[4], color);
+	lineCommon_->DrawLine(p[4], p[5], color);
+	lineCommon_->DrawLine(p[5], p[6], color);
+	lineCommon_->DrawLine(p[6], p[7], color);
+	lineCommon_->DrawLine(p[7], p[4], color);
 
 	// 側面（前後の接続）
-	LineCommon::GetInstance()->DrawLine(p[0], p[4], color);
-	LineCommon::GetInstance()->DrawLine(p[1], p[5], color);
-	LineCommon::GetInstance()->DrawLine(p[2], p[6], color);
-	LineCommon::GetInstance()->DrawLine(p[3], p[7], color);
+	lineCommon_->DrawLine(p[0], p[4], color);
+	lineCommon_->DrawLine(p[1], p[5], color);
+	lineCommon_->DrawLine(p[2], p[6], color);
+	lineCommon_->DrawLine(p[3], p[7], color);
 }
 
 void Line::DrawAABBVector3(Vector3 center, float radius, Vector4 color)
@@ -75,7 +75,7 @@ void Line::DrawGrid(Vector3 center, float Gridhalfwidth, uint32_t Subdivision)
 	// Z方向のライン（Xを固定してZを移動）
 	for (uint32_t i = 0; i <= Subdivision; ++i) {
 		float z = start + step * i;
-		LineCommon::GetInstance()->DrawLine(
+		lineCommon_->DrawLine(
 			{ center.x + start, center.y, center.z + z },
 			{ center.x + end,   center.y, center.z + z },
 			lineColor
@@ -85,7 +85,7 @@ void Line::DrawGrid(Vector3 center, float Gridhalfwidth, uint32_t Subdivision)
 	// X方向のライン（Zを固定してXを移動）
 	for (uint32_t i = 0; i <= Subdivision; ++i) {
 		float x = start + step * i;
-		LineCommon::GetInstance()->DrawLine(
+		lineCommon_->DrawLine(
 			{ center.x + x, center.y, center.z + start },
 			{ center.x + x, center.y, center.z + end },
 			lineColor
@@ -125,8 +125,8 @@ void Line::DrawSphere(const Vector3& center, float radius, const Vector4& color)
 
 
 			// 線を描画（緯度線・経度線）
-			LineCommon::GetInstance()->DrawLine(a, b, color); // 縦方向
-			LineCommon::GetInstance()->DrawLine(a, c, color); // 横方向
+			lineCommon_->DrawLine(a, b, color); // 縦方向
+			lineCommon_->DrawLine(a, c, color); // 横方向
 
 
 
@@ -152,7 +152,7 @@ void Line::DrawSkeleton(const Skeleton& skeleton, const std::vector<Matrix4x4>& 
 			int parentIndex = joint.parent.value();
 			Vector3 parentPos = MyMath::Transform(MyMath::GetTranslate(skeletonPose[parentIndex]), worldMatrix);
 
-			LineCommon::GetInstance()->DrawLine(parentPos, jointPos, color);
+			lineCommon_->DrawLine(parentPos, jointPos, color);
 		}
 	}
 

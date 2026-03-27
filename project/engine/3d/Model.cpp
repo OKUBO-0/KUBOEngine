@@ -40,8 +40,8 @@ void Model::Initialize(ModelCommon* modeleCommon, const std::string& directorypa
 	materialData->shiniess = 60.0f;                       // 光沢度
 
 	// テクスチャ読み込みとインデックス取得
-	TextureManager::GetInstance()->LoadTexture(modelData.material.textureFilePath);
-	modelData.material.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData.material.textureFilePath);
+	modelCommon_->GetTextureManager()->LoadTexture(modelData.material.textureFilePath);
+	modelData.material.textureIndex = modelCommon_->GetTextureManager()->GetTextureIndexByFilePath(modelData.material.textureFilePath);
 }
 
 void Model::Draw()
@@ -62,7 +62,7 @@ void Model::Draw()
 	modelCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
 	// テクスチャSRV設定
-	modelCommon_->GetSRVManager()->SetGraficsRootDescriptorTable(2, TextureManager::GetInstance()->GetTextureIndexByFilePath(modelData.material.textureFilePath));
+	modelCommon_->GetSRVManager()->SetGraficsRootDescriptorTable(2, modelCommon_->GetTextureManager()->GetTextureIndexByFilePath(modelData.material.textureFilePath));
 
 	// インデックス付き描画（インスタンス数 = 1）
 	modelCommon_->GetDxCommon()->GetCommandList()->DrawIndexedInstanced(

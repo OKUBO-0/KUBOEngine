@@ -2,25 +2,22 @@
 #include <map>
 #include <string>
 #include "Model.h"
+class TextureManager;
 class ModelManager
 {
-	static ModelManager* instance;
-
+public:
 	ModelManager() = default;
 	~ModelManager() = default;
-	ModelManager(ModelManager&) = default;
+	ModelManager(ModelManager&) = delete;
 	ModelManager& operator=(ModelManager&) = delete;
 
-public:
-	//シングルトンインスタンスの取得
-	static ModelManager* GetInstans();
 	//終了
 	void Finalize();
 
 /// <summary>
 /// 初期化
 /// </summary>
-	void Initialize(DirectXCommon* dxcommon, SrvManager* srvmnager);
+	void Initialize(DirectXCommon* dxcommon, SrvManager* srvmnager, TextureManager* textureManager);
 /// <summary>
 /// モデルの読み込み
 /// </summary>

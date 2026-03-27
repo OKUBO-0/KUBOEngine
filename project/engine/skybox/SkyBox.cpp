@@ -8,11 +8,11 @@ SkyBox::~SkyBox()
 
 }
 
-void SkyBox::Initialize(std::string textureFilePath)
+void SkyBox::Initialize(SkyBoxCommon* skyBoxCommon, std::string textureFilePath)
 {
-
-	dxCommon_ = SkyBoxCommon::GetInstance()->GetDxCommon();// DirectXの共通処理クラス
-	srvManager_ = SkyBoxCommon::GetInstance()->GetSrvManager();// SRV管理クラス
+	skyBoxCommon_ = skyBoxCommon;
+	dxCommon_ = skyBoxCommon_->GetDxCommon();// DirectXの共通処理クラス
+	srvManager_ = skyBoxCommon_->GetSrvManager();// SRV管理クラス
 	textureFilePath_ = textureFilePath;// テクスチャファイルパス
 
 
@@ -93,9 +93,9 @@ void SkyBox::Initialize(std::string textureFilePath)
 
 	//テクスチャ
 	//テクスチャファイルを読み込んでSRVを取得
-	TextureManager::GetInstance()->LoadTexture(textureFilePath_);//テクスチャファイルの読み込み
+	skyBoxCommon_->GetTextureManager()->LoadTexture(textureFilePath_);//テクスチャファイルの読み込み
 	//SRVのインデックスを取得
-	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath_);	//テクスチャ番号の取得
+	textureIndex_ = skyBoxCommon_->GetTextureManager()->GetTextureIndexByFilePath(textureFilePath_);	//テクスチャ番号の取得
 
 	//パーティクルグループのマテリアルデータを初期化
 	//マテリアル
@@ -110,7 +110,7 @@ void SkyBox::Initialize(std::string textureFilePath)
 	//transform
 	//トランスフォーム
 	//ModelTransform用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	transformationMatrixResource = SkyBoxCommon::GetInstance()->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
+	transformationMatrixResource = skyBoxCommon_->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
 	//書き込むためのアドレスを取得
 	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformaitionMatrixData));
 	//単位行列を書き込む
@@ -128,7 +128,7 @@ void SkyBox::Initialize(std::string textureFilePath)
 void SkyBox::Update()
 {
 	worldMatrix = MyMath::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-	Camera* activeCamera = CameraManager::GetInstance()->GetActiveCamera();
+	Camera* activeCamera = skyBoxCommon_->GetCameraManager()->GetActiveCamera();
 
 	if (activeCamera) {
 
@@ -146,19 +146,19 @@ void SkyBox::Update()
 
 void SkyBox::Draw()
 {
-	SkyBoxCommon::GetInstance()->commonDraw();//共通描画処理を呼び出す
+	skyBoxCommon_->commonDraw();//共通描画処理を呼び出す
 	//頂点バッファビューをセット
-	SkyBoxCommon::GetInstance()->GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+	skyBoxCommon_->GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
 	////Materialをセット
-	SkyBoxCommon::GetInstance()->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	skyBoxCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 	//トランスフォームをセット
-	SkyBoxCommon::GetInstance()->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
+	skyBoxCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	//テクスチャをセット
-	SkyBoxCommon::GetInstance()->GetSrvManager()->SetGraficsRootDescriptorTable(2, TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath_));
+	skyBoxCommon_->GetSrvManager()->SetGraficsRootDescriptorTable(2, skyBoxCommon_->GetTextureManager()->GetTextureIndexByFilePath(textureFilePath_));
 	//インデックスバッファビューをセット
-	SkyBoxCommon::GetInstance()->GetDxCommon()->GetCommandList()->IASetIndexBuffer(&indexBufferView);
+	skyBoxCommon_->GetDxCommon()->GetCommandList()->IASetIndexBuffer(&indexBufferView);
 	//描画
-	SkyBoxCommon::GetInstance()->GetDxCommon()->GetCommandList()->DrawIndexedInstanced(static_cast<UINT>(indices.size()), 1, 0, 0, 0);
+	skyBoxCommon_->GetDxCommon()->GetCommandList()->DrawIndexedInstanced(static_cast<UINT>(indices.size()), 1, 0, 0, 0);
 }
 
 void SkyBox::imguidebug()

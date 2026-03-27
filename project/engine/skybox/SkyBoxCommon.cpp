@@ -1,19 +1,13 @@
 #include "SkyBoxCommon.h"
+#include "CameraManager.h"
+#include "TextureManager.h"
 
-
-SkyBoxCommon* SkyBoxCommon::instance_ = nullptr;
-SkyBoxCommon* SkyBoxCommon::GetInstance()
-{
-	if (instance_ == nullptr) {
-		instance_ = new SkyBoxCommon();
-	}
-	return instance_;
-}
-
-void SkyBoxCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvmanager) {
+void SkyBoxCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvmanager, CameraManager* cameraManager, TextureManager* textureManager) {
 
 	dxCommon_ = dxCommon;
 	srvManager_ = srvmanager;
+	cameraManager_ = cameraManager;
+	textureManager_ = textureManager;
 
 	graphicsPipeline_ = new GraphicsPipeline();
 	graphicsPipeline_->Initialize(dxCommon_);
@@ -25,11 +19,11 @@ void SkyBoxCommon::Finalize()
 {
 
 	delete graphicsPipeline_;
-	if (instance_ != nullptr)
-	{
-		delete instance_;
-		instance_ = nullptr;
-	}
+	graphicsPipeline_ = nullptr;
+	dxCommon_ = nullptr;
+	srvManager_ = nullptr;
+	cameraManager_ = nullptr;
+	textureManager_ = nullptr;
 
 }
 

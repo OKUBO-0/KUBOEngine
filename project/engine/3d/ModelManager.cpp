@@ -1,28 +1,18 @@
 #include "ModelManager.h"
-ModelManager* ModelManager::instance = nullptr;
-
-ModelManager* ModelManager::GetInstans()
-{
-	if (instance == nullptr) {
-
-		instance = new ModelManager;
-	}
-	return instance;
-}
+#include "TextureManager.h"
 
 void ModelManager::Finalize()
 {
-
-	delete instance;
-	instance = nullptr;
-
+	models.clear();
+	modelCommon.reset();
+	srvmnager_ = nullptr;
 }
 
-void ModelManager::Initialize(DirectXCommon* dxcommon, SrvManager* srvmnager)
+void ModelManager::Initialize(DirectXCommon* dxcommon, SrvManager* srvmnager, TextureManager* textureManager)
 {
 	srvmnager_ = srvmnager;
 	modelCommon = std::make_unique<ModelCommon>();
-	modelCommon->Initialize(dxcommon, srvmnager_);
+	modelCommon->Initialize(dxcommon, srvmnager_, textureManager);
 
 
 }

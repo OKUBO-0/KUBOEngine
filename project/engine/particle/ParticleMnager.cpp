@@ -6,28 +6,16 @@
 #include <numbers>
 #include <imgui.h>
 
-
-//シングルトンインスタンスの取得
-
-ParticleMnager* ParticleMnager::instance_ = nullptr;
-ParticleMnager* ParticleMnager::GetInstance()
-{
-	if (instance_ == nullptr) {
-		instance_ = new ParticleMnager();
-	}
-	return instance_;
-
-
-}
-
-
-void ParticleMnager::Initialize(DirectXCommon* dxcommn, SrvManager* srvmaneger)
+void ParticleMnager::Initialize(DirectXCommon* dxcommn, SrvManager* srvmaneger, CameraManager* cameraManager, ModelManager* modelManager, TextureManager* textureManager)
 {
 
 
 	//引数で受け取ったポインタをメンバ変数に代入
 	dxCommon_ = dxcommn;
 	srvManager_ = srvmaneger;
+	cameraManager_ = cameraManager;
+	modelManager_ = modelManager;
+	textureManager_ = textureManager;
 	//乱数エンジンの初期化
 	std::random_device seedGenerator;
 	std::mt19937 random(seedGenerator());
@@ -57,10 +45,14 @@ void ParticleMnager::Initialize(DirectXCommon* dxcommn, SrvManager* srvmaneger)
 
 void ParticleMnager::Finalize()
 {
-
-	delete instance_;
-	instance_ = nullptr;
-
+	particleGroups.clear();
+	graphicsPipeline_.reset();
+	model_ = nullptr;
+	dxCommon_ = nullptr;
+	srvManager_ = nullptr;
+	cameraManager_ = nullptr;
+	modelManager_ = nullptr;
+	textureManager_ = nullptr;
 
 }
 
@@ -69,13 +61,13 @@ void ParticleMnager::Update()
 {
 	//カメラからビュープロジェクション行列を取得
 	//ビルボード行列の計算
-	Matrix4x4 billboardMatrix = backToFrontMatrix * CameraManager::GetInstance()->GetActiveCamera()->GetWorldMatrix();
+	Matrix4x4 billboardMatrix = backToFrontMatrix * cameraManager_->GetActiveCamera()->GetWorldMatrix();
 	billboardMatrix.m[3][0] = 0.0f;
 	billboardMatrix.m[3][1] = 0.0f;
 	billboardMatrix.m[3][2] = 0.0f;
 	//ビルボード行列を使ってビルボード行列を計算
-	Matrix4x4 viewMatrix = CameraManager::GetInstance()->GetActiveCamera()->GetViewMatrix();
-	Matrix4x4 projectionMatrix = CameraManager::GetInstance()->GetActiveCamera()->GetProjextionMatrix();
+	Matrix4x4 viewMatrix = cameraManager_->GetActiveCamera()->GetViewMatrix();
+	Matrix4x4 projectionMatrix = cameraManager_->GetActiveCamera()->GetProjextionMatrix();
 
 
 
@@ -229,9 +221,9 @@ void ParticleMnager::CreateParticleGroup(const std::string name, const std::stri
 	//テクスチャファイルパスを登録
 	particleGroups.at(name).materialdata.textureFilePath = textureFilePath;
 	//テクスチャファイルを読み込んでSRVを取得
-	TextureManager::GetInstance()->LoadTexture(textureFilePath);//テクスチャファイルの読み込み
+	textureManager_->LoadTexture(textureFilePath);//テクスチャファイルの読み込み
 	//SRVのインデックスを取得
-	particleGroups.at(name).materialdata.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);	//テクスチャ番号の取得
+	particleGroups.at(name).materialdata.textureIndex = textureManager_->GetTextureIndexByFilePath(textureFilePath);	//テクスチャ番号の取得
 	//最大インスタンスカウント
 	uint32_t MaxInstanceCount = 1000;
 	//インスタンス数を初期化
@@ -292,7 +284,7 @@ void ParticleMnager::Emit(const std::string& name, const Vector3 position, uint3
 void ParticleMnager::SetModel(const std::string& filepath)
 {
 	//もでるを検索してセットする
-	model_ = ModelManager::GetInstans()->FindModel(filepath);
+	model_ = modelManager_->FindModel(filepath);
 }
 
 std::vector<VertexData> ParticleMnager::MakeRingVertices(uint32_t  RingDivide, float outerRadius, float innerRadius)

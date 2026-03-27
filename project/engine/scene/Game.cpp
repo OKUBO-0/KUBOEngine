@@ -6,14 +6,16 @@ void Game::Initialize()
 	// 初期化
 	Framework::Initialize();
 	sceneFactory = std::make_unique<SceneFactory>();
-	SceneManager::GetInstance()->SetSceneFactory(sceneFactory.get());
+	GetEngineContext().sceneFactory = sceneFactory.get();
+	GetEngineContext().sceneManager->SetSceneFactory(GetEngineContext().sceneFactory);
+	GetEngineContext().sceneManager->SetServices(GetEngineContext().CreateSceneServices());
 
 	// シーンの変更
 	// "TITLE"
 	// "GAMEPLAY"
 	// "GAMEOVER"
 	// "GAMECLEAR"
-	SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	GetEngineContext().sceneManager->ChangeScene("GAMEPLAY");
 }
 
 void Game::Finalize()
@@ -25,30 +27,30 @@ void Game::Finalize()
 void Game::Update()
 {
 #ifdef _DEBUG
-	imGuiMnager->Begin();
+	GetEngineContext().imGuiManager->Begin();
 #endif // _DEBUG
 	// 更新
 	Framework::Update();
 
 #ifdef _DEBUG
-	ofscreenRenderManager->DrawImGui();
-	imGuiMnager->End();
+	GetEngineContext().ofscreenRenderManager->DrawImGui();
+	GetEngineContext().imGuiManager->End();
 #endif // _DEBUG
 }
 
 void Game::Draw()
 {
 	// DirectXの描画準備。すべての描画に共通のグラフィックスコマンドを積む
-	ofscreenRenderManager->Begin();
-	srvManager->PreDraw();
-	SceneManager::GetInstance()->Draw();
-	ofscreenRenderManager->End();
+	GetEngineContext().ofscreenRenderManager->Begin();
+	GetEngineContext().srvManager->PreDraw();
+	GetEngineContext().sceneManager->Draw();
+	GetEngineContext().ofscreenRenderManager->End();
 
-	dxCommon->Begin();
+	GetEngineContext().dxCommon->Begin();
 	// 描画
-	ofscreenRenderManager->Draw();
+	GetEngineContext().ofscreenRenderManager->Draw();
 #ifdef _DEBUG
-	imGuiMnager->Draw();
+	GetEngineContext().imGuiManager->Draw();
 #endif // _DEBUG
-	dxCommon->End();
+	GetEngineContext().dxCommon->End();
 }

@@ -28,15 +28,12 @@ struct SoundData {
 };
 
 class Audio {
-    static Audio* instance_;
+public:
+    template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
     Audio() = default;
     ~Audio() = default;
     Audio(const Audio&) = delete;
     Audio& operator=(const Audio&) = delete;
-
-public:
-    template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-    static Audio* GetInstance();
     void Initialize();
     void Finalize();
 

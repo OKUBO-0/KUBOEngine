@@ -2,28 +2,20 @@
 #include <cassert>
 #include <Logger.h>
 
-CameraManager* CameraManager::instance = nullptr;
-
-CameraManager* CameraManager::GetInstance()
-{
-    if (!instance) {
-        instance = new CameraManager();
-    }
-
-
-    return instance;
-
-}
-
 void CameraManager::Finalize()
 {
-
-    delete instance;
-    instance = nullptr;
+    cameras.clear();
+    activeCameraName.clear();
+    delete defaultCamera;
+    defaultCamera = nullptr;
 }
 
 void CameraManager::Initialize()
 {
+    cameras.clear();
+    activeCameraName.clear();
+    delete defaultCamera;
+    defaultCamera = nullptr;
 
     // デフォルトカメラの作成
     defaultCamera = new Camera();
@@ -37,8 +29,8 @@ void CameraManager::Initialize()
 
 void CameraManager::AddCamera(const std::string& name, const Camera* camera)
 {
-
-   // assert(cameras.find(name) == cameras.end() && "Camera with the same name already exists!");
+    assert(camera);
+    // assert(cameras.find(name) == cameras.end() && "Camera with the same name already exists!");
 
     cameras[name] = *camera; // Dereference the pointer to store the Camera object
     // 最初のカメラをアクティブに設定
@@ -72,7 +64,7 @@ Camera* CameraManager::GetActiveCamera() {
     if (activeCameraName.empty() || cameras.find(activeCameraName) == cameras.end()) {
         // アクティブカメラが無効な場合、デフォルトカメラを使用
         SetActiveCamera("default"); // デフォルトカメラをアクティブカメラとして設定
-        return defaultCamera;
+        return GetCamera("default");
     }
     return &cameras[activeCameraName];
 }

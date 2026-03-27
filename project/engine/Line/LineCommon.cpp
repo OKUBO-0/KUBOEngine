@@ -1,20 +1,12 @@
 #include "LineCommon.h"
 #include "MyMath.h"
-#include <CameraManager.h>
+#include "CameraManager.h"
 
-LineCommon* LineCommon::instance_ = nullptr;
-LineCommon* LineCommon::GetInstance()
-{
-	if (instance_ == nullptr) {
-		instance_ = new LineCommon();
-	}
-	return instance_;
-}
-
-void LineCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
+void LineCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, CameraManager* cameraManager)
 {
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
+	cameraManager_ = cameraManager;
 	//パイプラインの生成
 	graphicsPipeline_ = std::make_unique<GraphicsPipeline>();
 	graphicsPipeline_->Initialize(dxCommon_);
@@ -40,8 +32,15 @@ void LineCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 }
 void LineCommon::Finalize()
 {
-	delete instance_;
-	instance_ = nullptr;
+	graphicsPipeline_.reset();
+	vertexResource_.Reset();
+	instanceResource_.Reset();
+	cameraResource.Reset();
+	dxCommon_ = nullptr;
+	srvManager_ = nullptr;
+	cameraManager_ = nullptr;
+	instances_.clear();
+	instanceSrvIndex_ = UINT32_MAX;
 }
 void LineCommon::CommonDraw()
 {
@@ -56,8 +55,8 @@ void LineCommon::Update()
 {
 
 	 
-	camerabuffer->projection = CameraManager::GetInstance()->GetActiveCamera()->GetProjextionMatrix();
-	camerabuffer->view = CameraManager::GetInstance()->GetActiveCamera()->GetViewMatrix();
+	camerabuffer->projection = cameraManager_->GetActiveCamera()->GetProjextionMatrix();
+	camerabuffer->view = cameraManager_->GetActiveCamera()->GetViewMatrix();
 
 
 

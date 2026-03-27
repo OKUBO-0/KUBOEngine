@@ -9,6 +9,7 @@ class LineCommon;
 class Line
 {
 public:
+	void Initialize(LineCommon* lineCommon) { lineCommon_ = lineCommon; }
 
 
 	//ラインを描画する
@@ -24,6 +25,7 @@ public:
 	//skeletonを描画する
 	void DrawSkeleton(const Skeleton& skeleton, const std::vector<Matrix4x4>& skeletonPose, const Matrix4x4& worldMatrix, const Vector4& color={1.0f,1.0f,1.0f,1.0f});
 
-
+private:
+	LineCommon* lineCommon_ = nullptr;
 };
 

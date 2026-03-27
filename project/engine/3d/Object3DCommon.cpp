@@ -1,21 +1,17 @@
 #include "Object3DCommon.h"
 #include "Logger.h"
+#include "CameraManager.h"
+#include "ModelManager.h"
+#include "TextureManager.h"
 
-Object3DCommon* Object3DCommon::instance_ = nullptr;
-Object3DCommon* Object3DCommon::GetInstance()
-{
-	if (instance_ == nullptr) {
-		instance_ = new Object3DCommon();
-	}
-	return instance_;
-
-}
-
-void Object3DCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvmanage)
+void Object3DCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvmanage, CameraManager* cameraManager, ModelManager* modelManager, TextureManager* textureManager)
 {
 
 	dxCommon_ = dxCommon;
 	srvManager_ = srvmanage;
+	cameraManager_ = cameraManager;
+	modelManager_ = modelManager;
+	textureManager_ = textureManager;
 	//パイプラインの生成
 	graphicsPipeline_ = std::make_unique<GraphicsPipeline>();
 	graphicsPipeline_->Initialize(dxCommon_);
@@ -31,9 +27,13 @@ void Object3DCommon::Initialize(DirectXCommon* dxCommon, SrvManager* srvmanage)
 
 void Object3DCommon::Finalize()
 {
-	
-	delete instance_;
-	instance_ = nullptr;
+	graphicsPipeline_.reset();
+	skinningGraphicsPipeline_.reset();
+	dxCommon_ = nullptr;
+	srvManager_ = nullptr;
+	cameraManager_ = nullptr;
+	modelManager_ = nullptr;
+	textureManager_ = nullptr;
 }
 
 void Object3DCommon::CommonDraw()

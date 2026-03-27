@@ -3,16 +3,16 @@
 #include "TextureManager.h"
 #include "Matrix4x4.h"
 #include <MyMath.h>
-#include <CameraManager.h>
+#include "CameraManager.h"
 
 void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 {
     textureFilePath_ = textureFilePath;
 
     // テクスチャ読み込みとインデックス取得
-    TextureManager::GetInstance()->LoadTexture(textureFilePath);
     spriteCommon_ = spriteCommon;
-    textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
+    spriteCommon_->GetTextureManager()->LoadTexture(textureFilePath);
+    textureIndex = spriteCommon_->GetTextureManager()->GetTextureIndexByFilePath(textureFilePath);
 
     // GPUリソース生成（頂点・インデックス・マテリアル・行列）
     vetexResource = spriteCommon_->GetDxCommon()->CreateBufferResource(sizeof(VertexData) * 4);
@@ -41,7 +41,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
     transformaitionMatrixData->World = transformaitionMatrixData->World.MakeIdentity4x4();
 
     // カメラ用リソース
-    cameraResource = SpriteCommon::GetInstance()->GetDxCommon()->CreateBufferResource(sizeof(CaMeraForGpu));
+    cameraResource = spriteCommon_->GetDxCommon()->CreateBufferResource(sizeof(CaMeraForGpu));
     cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraForGpu));
     cameraForGpu->worldPosition = { 0.0f,0.0f,0.0f };
 
@@ -52,7 +52,7 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 void Sprite::Update()
 {
     // アクティブカメラの位置を取得しGPUへ送信
-    Camera* activeCamera = CameraManager::GetInstance()->GetActiveCamera();
+    Camera* activeCamera = spriteCommon_->GetCameraManager()->GetActiveCamera();
     Vector3 cameraPosition = activeCamera->GetTransform().translate;
     cameraForGpu->worldPosition = cameraPosition;
 
@@ -79,7 +79,7 @@ void Sprite::Update()
     }
 
     // テクスチャ座標計算
-    const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(textureFilePath_);
+    const DirectX::TexMetadata& metadata = spriteCommon_->GetTextureManager()->GetMetaData(textureFilePath_);
     float tex_left = textureLeftTop_.x / metadata.width;
     float tex_right = (textureLeftTop_.x + textureSize_.x) / metadata.width;
     float tex_top = textureLeftTop_.y / metadata.height;
@@ -126,7 +126,7 @@ void Sprite::Draw()
     spriteCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
     // テクスチャSRV設定 (RootParameter[1])
-    spriteCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(1, TextureManager::GetInstance()->GetSrvHandleGPU(textureFilePath_));
+    spriteCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(1, spriteCommon_->GetTextureManager()->GetSrvHandleGPU(textureFilePath_));
 
     // 行列CBV設定 (RootParameter[2])
     spriteCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(2, transformationMatrixResource->GetGPUVirtualAddress());
@@ -138,7 +138,7 @@ void Sprite::Draw()
 void Sprite::AdjustTextureSize()
 {
     // テクスチャメタデータを取得
-    const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(textureFilePath_);
+    const DirectX::TexMetadata& metadata = spriteCommon_->GetTextureManager()->GetMetaData(textureFilePath_);
 
     // 切り出しサイズをテクスチャ全体に設定
     textureSize_ = { static_cast<float>(metadata.width), static_cast<float>(metadata.height) };

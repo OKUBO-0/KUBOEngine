@@ -2,8 +2,8 @@
 #include "Object3D.h"
 #include "MyMath.h"
 #include "TextureManager.h"
-#include "ModelManager.h"
 #include "CameraManager.h"
+#include "ModelManager.h"
 #include <numbers>
 
 
@@ -101,7 +101,7 @@ void Object3D::Update()
 
 
 	worldMatrix = MyMath::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-	Camera* activeCamera = CameraManager::GetInstance()->GetActiveCamera();
+	Camera* activeCamera = object3DCommon_->GetCameraManager()->GetActiveCamera();
 
 	if (model_) {
 		//ライトのオンオフ
@@ -201,7 +201,7 @@ void Object3D::Draw()
 	//スポットライトのCBufferの場所を設定
 	object3DCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(6, spotLightResource->GetGPUVirtualAddress());
 	//環境マップテクスチャ
-	object3DCommon_->GetSrvManager()->SetGraficsRootDescriptorTable(7, TextureManager::GetInstance()->GetTextureIndexByFilePath(skyboxFilePath_));
+	object3DCommon_->GetSrvManager()->SetGraficsRootDescriptorTable(7, object3DCommon_->GetTextureManager()->GetTextureIndexByFilePath(skyboxFilePath_));
 	//環境マップの反射率ぼかし
 	object3DCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(8, environmentReflectionSettingResource->GetGPUVirtualAddress());
 	//3Dモデルが割り当てられているなら描画する
@@ -228,7 +228,7 @@ void Object3D::DrawSkinning()
 	//skeletonのデータをセット
 	object3DCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(7, model_->GetSkinCluster().paletteSrvHandle.second);
 	//環境マップテクスチャ
-	object3DCommon_->GetSrvManager()->SetGraficsRootDescriptorTable(8, TextureManager::GetInstance()->GetTextureIndexByFilePath(skyboxFilePath_));
+	object3DCommon_->GetSrvManager()->SetGraficsRootDescriptorTable(8, object3DCommon_->GetTextureManager()->GetTextureIndexByFilePath(skyboxFilePath_));
 	//環境マップの反射率ぼかし
 	object3DCommon_->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(9, environmentReflectionSettingResource->GetGPUVirtualAddress());
 	//3Dモデルが割り当てられているなら描画する
@@ -242,7 +242,7 @@ void Object3D::DrawSkinning()
 void Object3D::SetModel(const std::string& filepath)
 {
 	//もでるを検索してセットする
-	model_ = ModelManager::GetInstans()->FindModel(filepath);
+	model_ = object3DCommon_->GetModelManager()->FindModel(filepath);
 }
 
 

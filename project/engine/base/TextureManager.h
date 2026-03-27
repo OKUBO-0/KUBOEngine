@@ -11,13 +11,6 @@
 class TextureManager
 {
 private:
-	static TextureManager* instance;
-
-	TextureManager() = default;
-	~TextureManager() = default;
-	TextureManager(TextureManager&) = default;
-	TextureManager& operator=(TextureManager&) = delete;
-
 	//テクスチャ1枚分のデータ
 	struct TexturData {
 
@@ -29,8 +22,10 @@ private:
 
 	};
 public:
-	//シングルトンインタンス
-	static TextureManager* GetInstance();
+	TextureManager() = default;
+	~TextureManager() = default;
+	TextureManager(const TextureManager&) = delete;
+	TextureManager& operator=(const TextureManager&) = delete;
 	//終了
 	void Finalize();
 

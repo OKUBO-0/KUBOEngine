@@ -1,16 +1,6 @@
 #include "Audio.h"
 #include <wrl.h>
 
-Audio* Audio::instance_ = nullptr;
-
-Audio* Audio::GetInstance()
-{
-    if (instance_ == nullptr) {
-        instance_ = new Audio();
-    }
-    return instance_;
-}
-
 void Audio::Initialize()
 {
     HRESULT hr = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR);
@@ -32,7 +22,7 @@ void Audio::Finalize()
     activeVoices.clear();
 
     xAudio2.Reset();
-    delete instance_;
+    masterVoice = nullptr;
 }
 
 SoundData Audio::SoundLoadWave(const char* filename)

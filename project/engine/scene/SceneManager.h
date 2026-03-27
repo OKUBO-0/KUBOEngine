@@ -1,16 +1,20 @@
 #pragma once
 #include "BaseScene.h"
 #include "AbstractSceneFactory.h"
+#include "SceneServices.h"
+#include <memory>
 
 class SceneManager
 {
 public:
-
-	static SceneManager* GetInstance();
 	//シーンの設定
+	SceneManager() = default;
+	~SceneManager() = default;
+	SceneManager(SceneManager&) = delete;
+	SceneManager& operator=(SceneManager&) = delete;
 
 	//現在のシーンを取得
-	void SetNextScene(BaseScene* nextScene) { this ->nextScene = nextScene; };
+	void SetNextScene(std::unique_ptr<BaseScene> nextScene) { this->nextScene = std::move(nextScene); };
 	//シーンの更新
 	void Update();
 	//シーンの描画
@@ -20,24 +24,15 @@ public:
 
 	//sceneFactoryの設定
 	void SetSceneFactory(AbstractSceneFactory* sceneFactory) { this->sceneFactory = sceneFactory; }
+	void SetServices(SceneServices services) { services_ = services; }
 
 	void ChangeScene(const std::string &sceneName);
 	
-
 private:
-
-	SceneManager() = default;
-	~SceneManager() = default;
-	SceneManager(SceneManager&) = delete;
-	SceneManager& operator=(SceneManager&) = delete;
-
-	
-
-private:
-	static SceneManager* instance_;
-	BaseScene* currentScene = nullptr;
-	BaseScene* nextScene = nullptr;
+	std::unique_ptr<BaseScene> currentScene;
+	std::unique_ptr<BaseScene> nextScene;
 	AbstractSceneFactory* sceneFactory = nullptr;
+	SceneServices services_{};
 
 };
 

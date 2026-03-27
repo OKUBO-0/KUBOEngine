@@ -5,11 +5,11 @@
 #include <imgui.h>
 #include "Input.h"
 #include "SceneManager.h"
+#include "SceneServices.h"
 #include "CameraManager.h"
 
 void GameClearScene::Initialize()
 {
-	CameraManager::GetInstance()->Initialize();
 }
 
 void GameClearScene::Finalize()
@@ -18,7 +18,7 @@ void GameClearScene::Finalize()
 
 void GameClearScene::Update()
 {
-	CameraManager::GetInstance()->GetActiveCamera()->Update();
+	GetServices().cameraManager->GetActiveCamera()->Update();
 
 #ifdef _DEBUG
 	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
@@ -26,7 +26,7 @@ void GameClearScene::Update()
 		ImGui::Text("gameClearScene");
 		if (ImGui::Button("TitleScene"))
 		{
-			SceneManager::GetInstance()->ChangeScene("TITLE");
+			GetSceneManager()->ChangeScene("TITLE");
 		}
 	}
 #endif // _DEBUG
@@ -36,11 +36,11 @@ void GameClearScene::Draw()
 {
 #pragma region 3Dオブジェクト描画
 	//3dオブジェクトの描画準備。3Dオブジェクトの描画に共通のグラフィックスコマンドを積む
-	Object3DCommon::GetInstance()->CommonDraw();
+	GetServices().object3DCommon->CommonDraw();
 #pragma endregion
 
 #pragma region スプライト描画
 	//Spriteの描画準備。spriteの描画に共通のグラフィックスコマンドを積む
-	SpriteCommon::GetInstance()->CommonDraw();
+	GetServices().spriteCommon->CommonDraw();
 #pragma endregion
 }

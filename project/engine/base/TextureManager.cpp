@@ -5,23 +5,11 @@
 
 using namespace StringUtility;
 
-TextureManager* TextureManager::instance = nullptr;
-
-TextureManager* TextureManager::GetInstance()
-{
-	if (instance == nullptr) {
-
-		instance = new TextureManager;
-	}
-	return instance;
-}
-
 void TextureManager::Finalize()
 {
-
-	delete instance;
-	instance = nullptr;
-
+	textureDatas.clear();
+	dxCommon_ = nullptr;
+	srvmanager = nullptr;
 }
 
 void TextureManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvmanager)
