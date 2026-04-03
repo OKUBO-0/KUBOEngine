@@ -16,6 +16,8 @@ public:
 	virtual void Update() = 0;
 	//描画
 	virtual void Draw() = 0;
+	virtual const char* GetSceneName() const = 0;
+	virtual void DrawEditorImGui() {}
 	//デストラクタ
 	virtual ~BaseScene() = default;
 

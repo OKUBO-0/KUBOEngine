@@ -173,7 +173,7 @@ private:
 	//FPS固定初期化
 	void InitializeFixFPS();
 	//FPS固定更新
-	void UodateFixFPS();
+	void UpdateFixFPS();
 
 
 

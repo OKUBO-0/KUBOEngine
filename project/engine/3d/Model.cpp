@@ -4,6 +4,9 @@
 #include <assert.h>
 #include "TextureManager.h"
 #include "SrvManager.h"
+#include "Logger.h"
+
+using namespace Logger;
 
 void Model::Initialize(ModelCommon* modeleCommon, const std::string& directorypath, const std::string& filename)
 {
@@ -137,7 +140,10 @@ MaterialData Model::LoadMaterialTemplateFile(const std::string& directorypath, c
     MaterialData materialData; // 構築するマテリアルデータ
     std::string line;          // ファイルから読み込む1行
     std::ifstream file(directorypath + "/" + filename); // ファイルを開く
-    assert(file.is_open());    // 開けなかった場合は停止
+    if (!file.is_open()) {
+        Log("Model::LoadMaterialTemplateFile failed to open file: " + directorypath + "/" + filename + "\n");
+        return materialData;
+    }
 
     while (std::getline(file, line)) {
         std::string identifile;
@@ -162,22 +168,22 @@ ModelData Model::LoadModelFile(const std::string& ditrectoryPath, const std::str
     std::string path = ditrectoryPath + "/" + "models" + "/" + filename;
 
     // Assimpでモデルファイル読み込み
-    const aiScene* scene = importer.ReadFile(path.c_str(), aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
-    assert(scene->HasMeshes()); // メッシュが存在しない場合は停止
+    const aiScene* scene = importer.ReadFile(path.c_str(), aiProcess_Triangulate | aiProcess_FlipWindingOrder | aiProcess_FlipUVs);
+    if (scene == nullptr || !scene->HasMeshes()) {
+        Log("Model::LoadModelFile failed to load mesh: " + path + "\n");
+        return modelData;
+    }
 
     // メッシュごとの処理
     for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex) {
         aiMesh* mesh = scene->mMeshes[meshIndex];
-        assert(mesh->HasNormals());        // 法線情報必須
-        assert(mesh->HasTextureCoords(0)); // テクスチャ座標必須
-
         modelData.vertices.resize(mesh->mNumVertices); // 頂点数分確保
 
         // 頂点情報の読み込み
         for (uint32_t vertexIndex = 0; vertexIndex < mesh->mNumVertices; ++vertexIndex) {
             aiVector3D& position = mesh->mVertices[vertexIndex];
-            aiVector3D& normal = mesh->mNormals[vertexIndex];
-            aiVector3D& texcoord = mesh->mTextureCoords[0][vertexIndex];
+            aiVector3D normal = mesh->HasNormals() ? mesh->mNormals[vertexIndex] : aiVector3D{ 0.0f, 1.0f, 0.0f };
+            aiVector3D texcoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][vertexIndex] : aiVector3D{ 0.0f, 0.0f, 0.0f };
 
             // 右手系 → 左手系変換
             modelData.vertices[vertexIndex].position = { -position.x, position.y, position.z, 1.0f };
@@ -188,7 +194,10 @@ ModelData Model::LoadModelFile(const std::string& ditrectoryPath, const std::str
         // インデックス情報の読み込み（三角形のみ対応）
         for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex) {
             aiFace& face = mesh->mFaces[faceIndex];
-            assert(face.mNumIndices == 3);
+            if (face.mNumIndices != 3) {
+                Log("Model::LoadModelFile skipped non-triangle face in: " + path + "\n");
+                continue;
+            }
             for (uint32_t element = 0; element < face.mNumIndices; ++element) {
                 uint32_t vertexIndex = face.mIndices[element];
                 modelData.indices.push_back(vertexIndex);
@@ -237,6 +246,10 @@ ModelData Model::LoadModelFile(const std::string& ditrectoryPath, const std::str
     }
 
     // ルートノード読み込み
+    if (scene->mRootNode == nullptr) {
+        Log("Model::LoadModelFile failed. Root node is missing: " + path + "\n");
+        return modelData;
+    }
     modelData.rootNode = ReadNode(scene->mRootNode);
 
     return modelData;
@@ -249,6 +262,10 @@ Animation Model::LoadAnimationFile(const std::string& directoryPath, const std::
     std::string filepath = directoryPath + "/" + "models" + "/" + filename;
 
     const aiScene* scene = importer.ReadFile(filepath.c_str(), 0);
+    if (scene == nullptr) {
+        Log("Model::LoadAnimationFile failed to read file: " + filepath + "\n");
+        return animation;
+    }
 
     // アニメーションが存在しない場合は空を返す
     if (scene->mNumAnimations == 0) {

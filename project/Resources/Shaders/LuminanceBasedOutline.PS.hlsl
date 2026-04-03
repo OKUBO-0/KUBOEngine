@@ -3,6 +3,19 @@
 Texture2D<float4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
+cbuffer PostEffectParameters : register(b0)
+{
+    float2 gRadialBlurCenter;
+    float gRadialBlurWidth;
+    float gRadialBlurSamples;
+    float gVignettePower;
+    float gVignetteMultiplier;
+    float gBoxFilterStepScale;
+    float gBoxFilterBlend;
+    float gOutlineStrength;
+    float gOutlineThreshold;
+}
+
 static const float2 kIndex3x3[3][3] =
 {
     { { -1.0f, -1.0f }, { 0.0f, -1.0f }, { 1.0f, -1.0f } },
@@ -68,7 +81,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         }
     }
     float weight = length(difference);
-    weight = saturate(weight*6.0);
+    weight = saturate((weight - gOutlineThreshold) * gOutlineStrength);
     PixelShaderOutput output;
     //weitghtが大きいほど暗く表示するようにする
     

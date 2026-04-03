@@ -1,5 +1,5 @@
 #include "AttackBehavior.h"
-#include "ParticleMnager.h"
+#include "ParticleManager.h"
 #include <numbers>
 
 Particle AttackBehavior::Create(std::mt19937& randomEngine, const Vector3& pos)

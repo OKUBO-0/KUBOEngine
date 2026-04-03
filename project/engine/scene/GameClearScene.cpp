@@ -20,16 +20,6 @@ void GameClearScene::Update()
 {
 	GetServices().cameraManager->GetActiveCamera()->Update();
 
-#ifdef _DEBUG
-	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::Text("gameClearScene");
-		if (ImGui::Button("TitleScene"))
-		{
-			GetSceneManager()->ChangeScene("TITLE");
-		}
-	}
-#endif // _DEBUG
 }
 
 void GameClearScene::Draw()
@@ -43,4 +33,14 @@ void GameClearScene::Draw()
 	//Spriteの描画準備。spriteの描画に共通のグラフィックスコマンドを積む
 	GetServices().spriteCommon->CommonDraw();
 #pragma endregion
+}
+
+void GameClearScene::DrawEditorImGui()
+{
+	ImGui::Begin("Scene Inspector");
+	ImGui::TextUnformatted("Game Clear Scene");
+	if (ImGui::Button("Back To Title")) {
+		GetSceneManager()->ChangeScene("TITLE");
+	}
+	ImGui::End();
 }

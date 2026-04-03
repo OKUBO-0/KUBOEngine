@@ -3,6 +3,7 @@
 #include "TitleScene.h"
 #include "GameClearScene.h"
 #include "GameOverScene.h"
+#include "Logger.h"
 
 std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneName)
 {
@@ -21,7 +22,7 @@ std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneNam
 		newscene = std::make_unique<GameOverScene>();
 	}
 	else {
-		assert(0);
+		Logger::Log("SceneFactory::CreateScene failed. Unknown scene name: " + sceneName + "\n");
 	}
 
 	return newscene;

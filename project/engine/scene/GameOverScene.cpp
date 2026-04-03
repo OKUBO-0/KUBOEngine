@@ -20,16 +20,6 @@ void GameOverScene::Finalize()
 
 void GameOverScene::Update()
 {
-#ifdef _DEBUG
-	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::Text("gameOverScene");
-		if (ImGui::Button("TitleScene"))
-		{
-			GetSceneManager()->ChangeScene("TITLE");
-		}
-	}
-#endif // _DEBUG
 }
 
 void GameOverScene::Draw()
@@ -43,4 +33,16 @@ void GameOverScene::Draw()
 	//Spriteの描画準備。spriteの描画に共通のグラフィックスコマンドを積む
 	GetServices().spriteCommon->CommonDraw();
 #pragma endregion
+}
+
+void GameOverScene::DrawEditorImGui()
+{
+#ifdef _DEBUG
+	ImGui::Begin("Scene Inspector");
+	ImGui::TextUnformatted("Game Over Scene");
+	if (ImGui::Button("Back To Title")) {
+		GetSceneManager()->ChangeScene("TITLE");
+	}
+	ImGui::End();
+#endif // _DEBUG
 }

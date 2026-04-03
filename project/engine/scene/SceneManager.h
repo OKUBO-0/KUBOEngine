@@ -19,6 +19,7 @@ public:
 	void Update();
 	//シーンの描画
 	void Draw();
+	void DrawEditorImGui();
 	//シーンの終了
 	void Finalize();
 
@@ -27,12 +28,16 @@ public:
 	void SetServices(SceneServices services) { services_ = services; }
 
 	void ChangeScene(const std::string &sceneName);
+	const BaseScene* GetCurrentScene() const { return currentScene.get(); }
+	BaseScene* GetCurrentScene() { return currentScene.get(); }
+	const std::string& GetCurrentSceneName() const { return currentSceneName_; }
 	
 private:
 	std::unique_ptr<BaseScene> currentScene;
 	std::unique_ptr<BaseScene> nextScene;
 	AbstractSceneFactory* sceneFactory = nullptr;
 	SceneServices services_{};
+	std::string currentSceneName_;
 
 };
 

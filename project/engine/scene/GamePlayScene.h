@@ -6,10 +6,11 @@
 #include "Object3D.h"
 #include "Audio.h"
 #include "BaseScene.h"
+#include "GameObject.h"
 
 #include "SceneManager.h"
 #include "ParticleEmitter.h"
-#include "ParticleMnager.h"
+#include "ParticleManager.h"
 #include "Line.h"
 #include "SkyBox.h"
 
@@ -31,6 +32,8 @@ public:
 
     /// シーン描画（3Dモデル・スプライト・パーティクルなど）
     void Draw() override;
+    const char* GetSceneName() const override { return "GAMEPLAY"; }
+    void DrawEditorImGui() override;
 
     /// モデル読み込み
     void LoadModel();
@@ -42,6 +45,23 @@ public:
     void LoadAudio();
 
 private:
+    void InitializeCameras();
+    void InitializeSceneObjects();
+    void InitializeParticleEmitters();
+    void UpdatePlayerInput();
+    void UpdateSceneObjects();
+    void BuildEditorGameObjects();
+
+#ifdef _DEBUG
+    void DrawHierarchyWindow();
+    void DrawInspectorWindow();
+    void DrawSceneControlInspector();
+    void DrawSelectedGameObjectInspector();
+
+    size_t selectedGameObjectIndex_ = 0;
+    std::vector<std::unique_ptr<GameObject>> editorGameObjects_;
+#endif // _DEBUG
+
     // カメラ
     std::unique_ptr<Camera> camera1;   // メインカメラ
     std::unique_ptr<Camera> camera2;   // サブカメラ

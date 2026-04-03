@@ -1,5 +1,5 @@
 #include "SceneManager.h"
-#include <cassert>
+#include "Logger.h"
 
 void SceneManager::Update()
 {
@@ -15,6 +15,7 @@ void SceneManager::Update()
 
 		currentScene->SetSceneManager(this);
 		currentScene->SetServices(&services_);
+		currentSceneName_ = currentScene->GetSceneName();
 
 		//新シーンの初期化
 		currentScene->Initialize();
@@ -35,6 +36,13 @@ void SceneManager::Draw()
 	}
 }
 
+void SceneManager::DrawEditorImGui()
+{
+	if (currentScene) {
+		currentScene->DrawEditorImGui();
+	}
+}
+
 void SceneManager::Finalize()
 {
 	if (currentScene) {
@@ -42,15 +50,26 @@ void SceneManager::Finalize()
 		currentScene.reset();
 	}
 	nextScene.reset();
+	currentSceneName_.clear();
 
 }
 
 void SceneManager::ChangeScene(const std::string& sceneName)
 {
-	assert(sceneFactory);
-	assert(nextScene==nullptr);
+	if (sceneFactory == nullptr) {
+		Logger::Log("SceneManager::ChangeScene failed. sceneFactory is null.\n");
+		return;
+	}
+
+	if (nextScene != nullptr) {
+		Logger::Log("SceneManager::ChangeScene ignored. A next scene is already queued.\n");
+		return;
+	}
 
 	nextScene = sceneFactory->CreateScene(sceneName);
+	if (nextScene == nullptr) {
+		Logger::Log("SceneManager::ChangeScene failed. Scene creation returned null for: " + sceneName + "\n");
+	}
 
 }
 

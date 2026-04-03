@@ -11,8 +11,8 @@ class Input;
 class LineCommon;
 class ModelManager;
 class Object3DCommon;
-class OfscreenRenderManager;
-class ParticleMnager;
+class OffscreenRenderManager;
+class ParticleManager;
 class SceneManager;
 class SpriteCommon;
 class SrvManager;
@@ -26,14 +26,14 @@ struct EngineContext {
 	SrvManager* srvManager = nullptr;
 	ImGuiManager* imGuiManager = nullptr;
 	AbstractSceneFactory* sceneFactory = nullptr;
-	OfscreenRenderManager* ofscreenRenderManager = nullptr;
+	OffscreenRenderManager* offscreenRenderManager = nullptr;
 
 	Input* input = nullptr;
 	Audio* audio = nullptr;
 	CameraManager* cameraManager = nullptr;
 	ModelManager* modelManager = nullptr;
 	Object3DCommon* object3DCommon = nullptr;
-	ParticleMnager* particleManager = nullptr;
+	ParticleManager* particleManager = nullptr;
 	SceneManager* sceneManager = nullptr;
 	SpriteCommon* spriteCommon = nullptr;
 	TextureManager* textureManager = nullptr;

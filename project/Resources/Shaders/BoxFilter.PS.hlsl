@@ -3,6 +3,19 @@
 Texture2D<float4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
+cbuffer PostEffectParameters : register(b0)
+{
+    float2 gRadialBlurCenter;
+    float gRadialBlurWidth;
+    float gRadialBlurSamples;
+    float gVignettePower;
+    float gVignetteMultiplier;
+    float gBoxFilterStepScale;
+    float gBoxFilterBlend;
+    float gOutlineStrength;
+    float gOutlineThreshold;
+}
+
 static const float2 kIndex3x3[3][3] =
 {
     { { -1.0f, -1.0f }, { 0.0f, -1.0f }, { 1.0f, - 1.0f } },
@@ -48,6 +61,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     uint32_t width, height; // 1. uvStepSizeの算出
     gTexture.GetDimensions(width, height);
     float32_t2 uvStepSize = float32_t2(rcp(width), rcp(height));
+    uvStepSize *= gBoxFilterStepScale;
 
     PixelShaderOutput output;
     output.color.rgb = float32_t3(0.0f, 0.0f, 0.0f);
@@ -64,6 +78,9 @@ PixelShaderOutput main(VertexShaderOutput input)
             output.color.rgb += fetchColor * kKernel5x5[x][y];
         }
     }
+
+    float3 originalColor = gTexture.Sample(gSampler, input.texcoord).rgb;
+    output.color.rgb = lerp(originalColor, output.color.rgb, saturate(gBoxFilterBlend));
 
     
     return output;

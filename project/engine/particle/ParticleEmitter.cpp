@@ -3,7 +3,7 @@
 
 
 
-ParticleEmitter::ParticleEmitter(const Vector3& position, const float lifetime, const float currentTime, const uint32_t count, const std::string& name, ParticleMnager* particleManager)
+ParticleEmitter::ParticleEmitter(const Vector3& position, const float lifetime, const float currentTime, const uint32_t count, const std::string& name, ParticleManager* particleManager)
 {
 	position_ = position;//位置
 	frequency = lifetime;//寿命

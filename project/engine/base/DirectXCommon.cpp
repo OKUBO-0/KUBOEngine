@@ -318,7 +318,10 @@ void DirectXCommon::ImguiInitialize()
 //初期化
 void DirectXCommon::Initialize(WinApp* winApp)
 {
-	assert(winApp);//NULL検出
+	if (winApp == nullptr) {
+		Log("DirectXCommon::Initialize failed. winApp is null.\n");
+		return;
+	}
 	winApp_ = winApp;
 
 	InitializeFixFPS();
@@ -410,7 +413,7 @@ void DirectXCommon::End()
 		//イベントを待つ
 		WaitForSingleObject(fenceEvent, INFINITE);
 	}
-	UodateFixFPS();
+	UpdateFixFPS();
 	//次のフレーム用のコマンドリストを準備
 	hr = commandAllocator->Reset();
 	assert(SUCCEEDED(hr));
@@ -443,6 +446,11 @@ D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetRTVGPUDescriputorHandole(uint32_t 
 
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heaptype, UINT numDescriptrs, bool shaderVisible)
 {
+	if (device == nullptr) {
+		Log("DirectXCommon::CreateDescriptorHeap failed. device is null.\n");
+		return nullptr;
+	}
+
 	//ディスクリプタヒープの生成
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
@@ -450,8 +458,10 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHeap
 	descriptorHeapDesc.NumDescriptors = numDescriptrs;
 	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;//ダブルバッファ用に2つ。多くても別に構わない
 	HRESULT hr = device->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap));
-	//ディスクリプトひーぷが作れなかったので起動できない
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log(std::format("DirectXCommon::CreateDescriptorHeap failed. hr=0x{:08X}\n", static_cast<uint32_t>(hr)));
+		return nullptr;
+	}
 	return descriptorHeap;
 }
 
@@ -461,7 +471,7 @@ void DirectXCommon::InitializeFixFPS()
 	reference_ = std::chrono::steady_clock::now();
 }
 
-void DirectXCommon::UodateFixFPS()
+void DirectXCommon::UpdateFixFPS()
 {
 	//1/60秒ピッタリの時間
 	const std::chrono::microseconds kMinTime(uint64_t(1000000.0f / 60.0f));
@@ -508,15 +518,20 @@ D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetGPUDesctiptorHandle(Microsoft::WRL
 
 IDxcBlob* DirectXCommon::CompileShader(const std::wstring& filePath, const wchar_t* profile)
 {
-
+	if (dxcUtils == nullptr || dxcCompiler == nullptr || includeHandler == nullptr) {
+		Log("DirectXCommon::CompileShader failed. DXC compiler is not initialized.\n");
+		return nullptr;
+	}
 
 	//シェーダーをコンパイルする旨をログに出す
 	Log(ConvertString(std::format(L"Begin CompileShader,path:{},profile:{}\n", filePath, profile)));
 	//hlslファイルを読む
 	IDxcBlobEncoding* shaderSource = nullptr;
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderSource);
-	//読めなかったら止める
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || shaderSource == nullptr) {
+		Log(ConvertString(std::format(L"DirectXCommon::CompileShader failed to load file. path:{}\n", filePath)));
+		return nullptr;
+	}
 	//読み込んだファイルの内容を設定する
 	DxcBuffer shaderSourceBuffer;
 	shaderSourceBuffer.Ptr = shaderSource->GetBufferPointer();
@@ -543,21 +558,26 @@ IDxcBlob* DirectXCommon::CompileShader(const std::wstring& filePath, const wchar
 		IID_PPV_ARGS(&shaderResult)//コンパイル結果
 
 	);
-	//コンパイルエラーではなくDXCが起動できない致命的な状況
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || shaderResult == nullptr) {
+		Log(ConvertString(std::format(L"DirectXCommon::CompileShader failed to invoke compiler. path:{}\n", filePath)));
+		return nullptr;
+	}
 
 	//警告・エラーが出たらログに出して止める
 	IDxcBlobUtf8* shaderError = nullptr;
 	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0) {
 		Log(shaderError->GetStringPointer());
-		assert(false);
+		return nullptr;
 	}
 
 	//コンパイル結果から実行用のバイナリ部分を取得
 	IDxcBlob* shaderBlob = nullptr;
 	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || shaderBlob == nullptr) {
+		Log(ConvertString(std::format(L"DirectXCommon::CompileShader failed to get shader object. path:{}\n", filePath)));
+		return nullptr;
+	}
 	//成功したログを出す
 	Log(ConvertString(std::format(L"Complite Succeded,path:{},profile:{}\n", filePath, profile)));
 
@@ -569,6 +589,10 @@ IDxcBlob* DirectXCommon::CompileShader(const std::wstring& filePath, const wchar
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_t sizeInBytes)
 {
+	if (device == nullptr) {
+		Log("DirectXCommon::CreateBufferResource failed. device is null.\n");
+		return nullptr;
+	}
 
 	//VertexResourceを作成
 	//頂点リソース用ヒープの設定
@@ -591,7 +615,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = nullptr;
 	HRESULT hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
 		&vertexResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexResource));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log(std::format("DirectXCommon::CreateBufferResource failed. hr=0x{:08X}\n", static_cast<uint32_t>(hr)));
+		return nullptr;
+	}
 
 	return vertexResource;
 
@@ -599,6 +626,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(const DirectX::TexMetadata& metadata)
 {
+	if (device == nullptr) {
+		Log("DirectXCommon::CreateTextureResource failed. device is null.\n");
+		return nullptr;
+	}
 	//metadataを基にResourceの設定
 	D3D12_RESOURCE_DESC resouceDesc{ };
 	resouceDesc.Width = UINT(metadata.width);//Textureの幅
@@ -623,7 +654,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(cons
 		nullptr,//Clear最適値。使わないのでnullptr
 		IID_PPV_ARGS(&resource));
 
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log(std::format("DirectXCommon::CreateTextureResource failed. hr=0x{:08X}\n", static_cast<uint32_t>(hr)));
+		return nullptr;
+	}
 	return resource;
 
 }
@@ -656,9 +690,16 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData
 
 void DirectXCommon::CommandKick()
 {
+	if (commandList == nullptr || commandQueue == nullptr || commandAllocator == nullptr || fence == nullptr) {
+		Log("DirectXCommon::CommandKick failed. command resources are not initialized.\n");
+		return;
+	}
 
 	hr = commandList->Close();
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log(std::format("DirectXCommon::CommandKick failed to close command list. hr=0x{:08X}\n", static_cast<uint32_t>(hr)));
+		return;
+	}
 	//GPUにコマンドリストの実行を行わせる
 	ID3D12CommandList* commandLists[] = { commandList.Get() };
 	commandQueue->ExecuteCommandLists(1, commandLists);
@@ -678,9 +719,14 @@ void DirectXCommon::CommandKick()
 
 	//次のフレーム用のコマンドリストを準備
 	hr = commandAllocator->Reset();
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log(std::format("DirectXCommon::CommandKick failed to reset command allocator. hr=0x{:08X}\n", static_cast<uint32_t>(hr)));
+		return;
+	}
 	hr = commandList->Reset(commandAllocator.Get(), nullptr);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log(std::format("DirectXCommon::CommandKick failed to reset command list. hr=0x{:08X}\n", static_cast<uint32_t>(hr)));
+	}
 
 
 }

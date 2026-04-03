@@ -93,7 +93,7 @@
     <ClCompile Include="engine\base\Logger.cpp">
       <Filter>ソースファイルcpp\base</Filter>
     </ClCompile>
-    <ClCompile Include="engine\base\OfscreenRenderManager.cpp">
+    <ClCompile Include="engine\base\OffscreenRenderManager.cpp">
       <Filter>ソースファイルcpp\base</Filter>
     </ClCompile>
     <ClCompile Include="engine\base\SrvManager.cpp">
@@ -150,7 +150,7 @@
     <ClCompile Include="engine\particle\MagicCircleBehavior.cpp">
       <Filter>ソースファイルcpp\particle</Filter>
     </ClCompile>
-    <ClCompile Include="engine\particle\ParticleMnager.cpp">
+    <ClCompile Include="engine\particle\ParticleManager.cpp">
       <Filter>ソースファイルcpp\particle</Filter>
     </ClCompile>
     <ClCompile Include="engine\particle\ParticleEmitter.cpp">
@@ -218,7 +218,7 @@
     <ClInclude Include="engine\base\Logger.h">
       <Filter>ヘッダーファイル\base</Filter>
     </ClInclude>
-    <ClInclude Include="engine\base\OfscreenRenderManager.h">
+    <ClInclude Include="engine\base\OffscreenRenderManager.h">
       <Filter>ヘッダーファイル\base</Filter>
     </ClInclude>
     <ClInclude Include="engine\base\StringUtility.h">
@@ -302,7 +302,7 @@
     <ClInclude Include="engine\particle\ParticleEmitter.h">
       <Filter>ヘッダーファイル\particle</Filter>
     </ClInclude>
-    <ClInclude Include="engine\particle\ParticleMnager.h">
+    <ClInclude Include="engine\particle\ParticleManager.h">
       <Filter>ヘッダーファイル\particle</Filter>
     </ClInclude>
     <ClInclude Include="engine\math\Quaternion.h">

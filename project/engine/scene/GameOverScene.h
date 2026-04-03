@@ -20,6 +20,8 @@ public:
 	/// シーンの描画
 	/// </summary>
 	void Draw()override;
+	const char* GetSceneName() const override { return "GAMEOVER"; }
+	void DrawEditorImGui() override;
 
 private:
 

@@ -26,18 +26,6 @@ void TitleScene::Update()
 		
 	}
 
-	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::Text("titleScene %d");
-		if (ImGui::Button("gamePlayScene"))
-		{
-			GetSceneManager()->ChangeScene("GAMEPLAY");
-		}
-		
-
-
-	}
-
 }
 
 void TitleScene::Draw()
@@ -48,4 +36,14 @@ void TitleScene::Draw()
 	//Spriteの描画準備。spriteの描画に共通のグラフィックスコマンドを積む
 	GetServices().spriteCommon->CommonDraw();
 
+}
+
+void TitleScene::DrawEditorImGui()
+{
+	ImGui::Begin("Scene Inspector");
+	ImGui::TextUnformatted("Title Scene");
+	if (ImGui::Button("Go To Gameplay")) {
+		GetSceneManager()->ChangeScene("GAMEPLAY");
+	}
+	ImGui::End();
 }

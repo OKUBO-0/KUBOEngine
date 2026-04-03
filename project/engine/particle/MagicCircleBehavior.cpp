@@ -1,5 +1,5 @@
 #include "MagicCircleBehavior.h"
-#include "ParticleMnager.h"
+#include "ParticleManager.h"
 
 Particle MagicCircleBehavior::Create(std::mt19937& rng, const Vector3& pos)
 {

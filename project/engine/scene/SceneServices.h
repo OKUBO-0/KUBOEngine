@@ -5,7 +5,7 @@ class CameraManager;
 class Input;
 class ModelManager;
 class Object3DCommon;
-class ParticleMnager;
+class ParticleManager;
 class SpriteCommon;
 class LineCommon;
 class SkyBoxCommon;
@@ -16,7 +16,7 @@ struct SceneServices {
 	CameraManager* cameraManager = nullptr;
 	ModelManager* modelManager = nullptr;
 	Object3DCommon* object3DCommon = nullptr;
-	ParticleMnager* particleManager = nullptr;
+	ParticleManager* particleManager = nullptr;
 	SpriteCommon* spriteCommon = nullptr;
 	LineCommon* lineCommon = nullptr;
 	SkyBoxCommon* skyBoxCommon = nullptr;

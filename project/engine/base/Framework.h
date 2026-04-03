@@ -13,7 +13,7 @@
 #include "Object3DCommon.h"
 #include "RenderingData.h"
 #include "ModelManager.h"
-#include "ParticleMnager.h"
+#include "ParticleManager.h"
 #include "TextureManager.h"
 #include "ImGuiManager.h"
 #include "EngineContext.h"
@@ -22,9 +22,9 @@
 #include "SrvManager.h"
 #include "SceneManager.h"
 #include <SceneFactory.h>
-#include "OfscreenRenderManager.h"
+#include "OffscreenRenderManager.h"
 
-#include "Linecommon.h"
+#include "LineCommon.h"
 #include "Line.h"
 #include "SkyBoxCommon.h"
 
@@ -47,6 +47,13 @@ public:
 protected:
 	EngineContext& GetEngineContext() { return engineContext_; }
 	const EngineContext& GetEngineContext() const { return engineContext_; }
+	void InitializePlatform();
+	void InitializeRenderServices();
+	void InitializeEngineServices();
+	void InitializeDebugTools();
+	void FinalizeDebugTools();
+	void FinalizeEngineServices();
+	void ResetOwnedServices();
 
 public:
 	// ゲーム終了フラグ
@@ -65,7 +72,7 @@ public:
 	std::unique_ptr<Audio> audio;
 	std::unique_ptr<CameraManager> cameraManager;
 	std::unique_ptr<ModelManager> modelManager;
-	std::unique_ptr<ParticleMnager> particleManager;
+	std::unique_ptr<ParticleManager> particleManager;
 	std::unique_ptr<SpriteCommon> spriteCommon;
 	std::unique_ptr<Object3DCommon> object3DCommon;
 	std::unique_ptr<LineCommon> lineCommon;
@@ -74,6 +81,6 @@ public:
 	std::unique_ptr<SceneManager> sceneManager;
 	// SceneFactoryのポインタ
 	std::unique_ptr<AbstractSceneFactory> sceneFactory;
-	std::unique_ptr<OfscreenRenderManager> ofscreenRenderManager;
+	std::unique_ptr<OffscreenRenderManager> offscreenRenderManager;
 	EngineContext engineContext_{};
 };

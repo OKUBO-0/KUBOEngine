@@ -1,7 +1,7 @@
 #pragma once
 #include <Vector3.h>
 #include <string>
-#include "ParticleMnager.h"
+#include "ParticleManager.h"
 
 
 class ParticleEmitter
@@ -14,7 +14,7 @@ public:
 		const float currentTime,
 		const uint32_t count,
 		const std::string& name,
-		ParticleMnager* particleManager
+		ParticleManager* particleManager
 	
 	);
 
@@ -52,7 +52,7 @@ private:
 	//名前
 	std::string name_;
 	//particleタイプ
-	ParticleMnager* particleManager_ = nullptr;
+	ParticleManager* particleManager_ = nullptr;
 
 
 };

@@ -19,4 +19,7 @@ public:
 	void Update() override;
 	// 描画
 	void Draw() override;
+
+private:
+	void DrawEngineEditorImGui();
 };

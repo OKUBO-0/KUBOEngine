@@ -1,6 +1,92 @@
 #include "GraphicsPipeline.h"
 #include "Logger.h"
-#include "OfscreenRenderManager.h"
+#include "OffscreenRenderManager.h"
+#include "StringUtility.h"
+#include <format>
+
+namespace {
+bool EnsureDxCommonReady(DirectXCommon* dxCommon, const char* context)
+{
+	if (dxCommon == nullptr) {
+		Logger::Log(std::string(context) + " failed. DirectXCommon is null.\n");
+		return false;
+	}
+
+	if (dxCommon->GetDevice() == nullptr) {
+		Logger::Log(std::string(context) + " failed. D3D12 device is null.\n");
+		return false;
+	}
+
+	return true;
+}
+
+bool EnsureShaderBlob(IDxcBlob* shaderBlob, const char* context, const wchar_t* shaderPath)
+{
+	if (shaderBlob != nullptr) {
+		return true;
+	}
+
+	Logger::Log(std::string(context) + " failed. Shader compile returned null: "
+		+ StringUtility::ConvertString(shaderPath) + "\n");
+	return false;
+}
+
+bool CreatePipelineStateSafely(
+	DirectXCommon* dxCommon,
+	const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc,
+	Microsoft::WRL::ComPtr<ID3D12PipelineState>& pipelineState,
+	const char* context)
+{
+	if (!EnsureDxCommonReady(dxCommon, context)) {
+		return false;
+	}
+
+	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipelineState));
+	if (FAILED(hr)) {
+		Logger::Log(std::format("{} failed. CreateGraphicsPipelineState hr=0x{:08X}\n",
+			context, static_cast<uint32_t>(hr)));
+		return false;
+	}
+
+	return true;
+}
+
+bool CreateRootSignatureSafely(
+	DirectXCommon* dxCommon,
+	const D3D12_ROOT_SIGNATURE_DESC& desc,
+	Microsoft::WRL::ComPtr<ID3D12RootSignature>& rootSignature,
+	const char* context)
+{
+	if (!EnsureDxCommonReady(dxCommon, context)) {
+		return false;
+	}
+
+	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
+	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+	if (FAILED(hr)) {
+		if (errorBlob != nullptr) {
+			Logger::Log(reinterpret_cast<const char*>(errorBlob->GetBufferPointer()));
+		}
+		Logger::Log(std::format("{} failed. D3D12SerializeRootSignature hr=0x{:08X}\n",
+			context, static_cast<uint32_t>(hr)));
+		return false;
+	}
+
+	hr = dxCommon->GetDevice()->CreateRootSignature(
+		0,
+		signatureBlob->GetBufferPointer(),
+		signatureBlob->GetBufferSize(),
+		IID_PPV_ARGS(&rootSignature));
+	if (FAILED(hr)) {
+		Logger::Log(std::format("{} failed. CreateRootSignature hr=0x{:08X}\n",
+			context, static_cast<uint32_t>(hr)));
+		return false;
+	}
+
+	return true;
+}
+}
 
 
 
@@ -8,6 +94,9 @@ void GraphicsPipeline::Create()
 {
 
 	RootSignatureCreate();
+	if (rootSignature == nullptr) {
+		return;
+	}
 
 	//InputLayout
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
@@ -55,11 +144,15 @@ void GraphicsPipeline::Create()
 	//shaderをコンパイルする
 	IDxcBlob* vertexshaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexshaderBlob != nullptr);
+	if (!EnsureShaderBlob(vertexshaderBlob, "GraphicsPipeline::Create", L"Resources/Shaders/Object3D.VS.hlsl")) {
+		return;
+	}
 
 	IDxcBlob* pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Object3D.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!EnsureShaderBlob(pixelShaderBlob, "GraphicsPipeline::Create", L"Resources/Shaders/Object3D.PS.hlsl")) {
+		return;
+	}
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -94,9 +187,7 @@ void GraphicsPipeline::Create()
 	graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
 	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(&graphicsPipelineState));
-	assert(SUCCEEDED(hr));
+	CreatePipelineStateSafely(dxCommon_, graphicsPipelineStateDesc, graphicsPipelineState, "GraphicsPipeline::Create");
 
 }
 
@@ -181,20 +272,7 @@ void GraphicsPipeline::RootSignatureCreate()
 
 
 
-	//シリアライズしてバイナリする
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-
-		Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
-		assert(false);
-
-	}
-	//バイナリをもとに生成
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, descriptionRootSignature, rootSignature, "GraphicsPipeline::RootSignatureCreate");
 
 
 
@@ -205,6 +283,9 @@ void GraphicsPipeline::CreateParticle()
 {
 
 	RootSignatureParticleCreate();
+	if (rootSignatureParticle == nullptr) {
+		return;
+	}
 
 	//InputLayout
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
@@ -250,11 +331,15 @@ void GraphicsPipeline::CreateParticle()
 	//shaderをコンパイルする
 	IDxcBlob* vertexshaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexshaderBlob != nullptr);
+	if (!EnsureShaderBlob(vertexshaderBlob, "GraphicsPipeline::CreateParticle", L"Resources/Shaders/Particle.VS.hlsl")) {
+		return;
+	}
 
 	IDxcBlob* pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Particle.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!EnsureShaderBlob(pixelShaderBlob, "GraphicsPipeline::CreateParticle", L"Resources/Shaders/Particle.PS.hlsl")) {
+		return;
+	}
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -290,9 +375,7 @@ void GraphicsPipeline::CreateParticle()
 	graphicsPipelineStateDescparticle.DepthStencilState = depthStencilDesc;
 	graphicsPipelineStateDescparticle.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDescparticle,
-		IID_PPV_ARGS(&graphicsPipelineStateParticle));
-	assert(SUCCEEDED(hr));
+	CreatePipelineStateSafely(dxCommon_, graphicsPipelineStateDescparticle, graphicsPipelineStateParticle, "GraphicsPipeline::CreateParticle");
 
 
 
@@ -347,20 +430,7 @@ void GraphicsPipeline::RootSignatureParticleCreate()
 
 
 
-	//シリアライズしてバイナリする
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-
-		Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
-		assert(false);
-
-	}
-	//バイナリをもとに生成
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureParticle));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, descriptionRootSignature, rootSignatureParticle, "GraphicsPipeline::RootSignatureParticleCreate");
 
 
 }
@@ -372,6 +442,9 @@ void GraphicsPipeline::RootSignatureParticleCreate()
 void GraphicsPipeline::CreateSprite()
 {
 	RootSignatureSpriteCreate();
+	if (rootSignatureSprite == nullptr) {
+		return;
+	}
 
 	//InputLayout
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
@@ -415,11 +488,15 @@ void GraphicsPipeline::CreateSprite()
 	//shaderをコンパイルする
 	IDxcBlob* vertexshaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Sprite.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexshaderBlob != nullptr);
+	if (!EnsureShaderBlob(vertexshaderBlob, "GraphicsPipeline::CreateSprite", L"Resources/Shaders/Sprite.VS.hlsl")) {
+		return;
+	}
 
 	IDxcBlob* pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Sprite.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!EnsureShaderBlob(pixelShaderBlob, "GraphicsPipeline::CreateSprite", L"Resources/Shaders/Sprite.PS.hlsl")) {
+		return;
+	}
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -454,9 +531,7 @@ void GraphicsPipeline::CreateSprite()
 	graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
 	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(&graphicsPipelineStateSprite));
-	assert(SUCCEEDED(hr));
+	CreatePipelineStateSafely(dxCommon_, graphicsPipelineStateDesc, graphicsPipelineStateSprite, "GraphicsPipeline::CreateSprite");
 
 
 
@@ -498,17 +573,7 @@ void GraphicsPipeline::RootSignatureLineCreate()
 	descriptionRootSignature.pStaticSamplers = nullptr;
 	descriptionRootSignature.NumStaticSamplers = 0;
 
-	// シリアライズしてRootSignatureを生成
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-		Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
-		assert(false);
-	}
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureLine));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, descriptionRootSignature, rootSignatureLine, "GraphicsPipeline::RootSignatureLineCreate");
 
 }
 
@@ -610,29 +675,16 @@ void GraphicsPipeline::RootSignatureSkinningCreate()
 
 
 
-	//シリアライズしてバイナリする
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-
-		Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
-		assert(false);
-
-	}
-	//バイナリをもとに生成
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureSkinning));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, descriptionRootSignature, rootSignatureSkinning, "GraphicsPipeline::RootSignatureSkinningCreate");
 
 }
 
 void GraphicsPipeline::CreateSkinning()
 {
-
-
-
 	RootSignatureSkinningCreate();
+	if (rootSignatureSkinning == nullptr) {
+		return;
+	}
 
 	//InputLayout
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[5] = {};
@@ -695,11 +747,15 @@ void GraphicsPipeline::CreateSkinning()
 	//shaderをコンパイルする
 	IDxcBlob* vertexshaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/SkinningObject3d.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexshaderBlob != nullptr);
+	if (!EnsureShaderBlob(vertexshaderBlob, "GraphicsPipeline::CreateSkinning", L"Resources/Shaders/SkinningObject3d.VS.hlsl")) {
+		return;
+	}
 
 	IDxcBlob* pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/SkinningObject3d.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!EnsureShaderBlob(pixelShaderBlob, "GraphicsPipeline::CreateSkinning", L"Resources/Shaders/SkinningObject3d.PS.hlsl")) {
+		return;
+	}
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -734,9 +790,7 @@ void GraphicsPipeline::CreateSkinning()
 	graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
 	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(&graphicsPipelineStateSkinning));
-	assert(SUCCEEDED(hr));
+	CreatePipelineStateSafely(dxCommon_, graphicsPipelineStateDesc, graphicsPipelineStateSkinning, "GraphicsPipeline::CreateSkinning");
 
 
 }
@@ -745,6 +799,9 @@ void GraphicsPipeline::CreateLine()
 {
 	// RootSignature作成（ライン用）
 	RootSignatureLineCreate(); 
+	if (rootSignatureLine == nullptr) {
+		return;
+	}
 	// InputLayout（位置だけでOK）
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[1] = {};
 	inputElementDescs[0].SemanticName = "POSITION";
@@ -780,10 +837,14 @@ void GraphicsPipeline::CreateLine()
 
 	// Shader
 	IDxcBlob* vertexShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Line.VS.hlsl", L"vs_6_0");
-	assert(vertexShaderBlob != nullptr);
+	if (!EnsureShaderBlob(vertexShaderBlob, "GraphicsPipeline::CreateLine", L"Resources/Shaders/Line.VS.hlsl")) {
+		return;
+	}
 
 	IDxcBlob* pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Line.PS.hlsl", L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!EnsureShaderBlob(pixelShaderBlob, "GraphicsPipeline::CreateLine", L"Resources/Shaders/Line.PS.hlsl")) {
+		return;
+	}
 
 	// PSO作成
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
@@ -801,9 +862,7 @@ void GraphicsPipeline::CreateLine()
 	pipelineDesc.DepthStencilState = depthStencilDesc;
 	pipelineDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
-	// PSO生成
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&pipelineDesc, IID_PPV_ARGS(&graphicsPipelineStateLine));
-	assert(SUCCEEDED(hr));
+	CreatePipelineStateSafely(dxCommon_, pipelineDesc, graphicsPipelineStateLine, "GraphicsPipeline::CreateLine");
 
 
 
@@ -863,17 +922,7 @@ void GraphicsPipeline::RootSignatureSpriteCreate()
 	descriptionRootSignature.pStaticSamplers = staticSamplers;
 	descriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
 
-	// シリアライズとRootSignature生成
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-		Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
-		assert(false);
-	}
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureSprite));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, descriptionRootSignature, rootSignatureSprite, "GraphicsPipeline::RootSignatureSpriteCreate");
 
 
 }
@@ -884,14 +933,21 @@ void GraphicsPipeline::CreateCopyImage(PostEffectType type, const std::wstring& 
 	//InputLayout
 	// ルートシグネチャを作成（SRV1つとサンプラのみ）
 	RootSignatureCopyImageCreate();
+	if (rootSignatureCopyImage == nullptr) {
+		return;
+	}
 
 	// VS は共通のものを使う
 	IDxcBlob* vsBlob = dxCommon_->CompileShader(L"Resources/Shaders/Fullscreen.VS.hlsl", L"vs_6_0");
-	assert(vsBlob != nullptr);
+	if (!EnsureShaderBlob(vsBlob, "GraphicsPipeline::CreateCopyImage", L"Resources/Shaders/Fullscreen.VS.hlsl")) {
+		return;
+	}
 
 	// PS は type によって切り替え（ファイル名で渡す）
 	IDxcBlob* psBlob = dxCommon_->CompileShader(psFilename.c_str(), L"ps_6_0");
-	assert(psBlob != nullptr);
+	if (!EnsureShaderBlob(psBlob, "GraphicsPipeline::CreateCopyImage", psFilename.c_str())) {
+		return;
+	}
 
 
 	// 頂点データは使わないので設定しない（InputLayoutを無効に）
@@ -931,8 +987,9 @@ void GraphicsPipeline::CreateCopyImage(PostEffectType type, const std::wstring& 
 
 	// PSO作成
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pso;
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
-	assert(SUCCEEDED(hr));
+	if (!CreatePipelineStateSafely(dxCommon_, desc, pso, "GraphicsPipeline::CreateCopyImage")) {
+		return;
+	}
 
 	// マップに登録
 	copyImagePipelines_[type] = pso;
@@ -956,7 +1013,7 @@ void GraphicsPipeline::CreateAllPostEffects() {
 		{ PostEffectType::Vignette, L"Resources/Shaders/Vignette.PS.hlsl" },
 		{ PostEffectType::BoxFilter, L"Resources/Shaders/BoxFilter.PS.hlsl" },
 		{ PostEffectType::LuminanceOutline, L"Resources/Shaders/LuminanceBasedOutline.PS.hlsl" },
-		{ PostEffectType::RdialBlur, L"Resources/Shaders/RadialBlur.PS.hlsl" }
+		{ PostEffectType::RadialBlur, L"Resources/Shaders/RadialBlur.PS.hlsl" }
 	};
 
 	for (const auto& effect : effects) {
@@ -977,15 +1034,18 @@ void GraphicsPipeline::RootSignatureCopyImageCreate()
 	range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// RootParameter（テクスチャSRVのみ）
-	D3D12_ROOT_PARAMETER rootParam{};
-	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam.DescriptorTable.NumDescriptorRanges = 1;
-	rootParam.DescriptorTable.pDescriptorRanges = &range;
-	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	D3D12_ROOT_PARAMETER rootParams[2] = {};
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[0].DescriptorTable.pDescriptorRanges = &range;
+	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-	desc.pParameters = &rootParam;
-	desc.NumParameters = 1;
+	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParams[1].Descriptor.ShaderRegister = 0;
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	desc.pParameters = rootParams;
+	desc.NumParameters = _countof(rootParams);
 
 	// Static Sampler（必要なら）
 	D3D12_STATIC_SAMPLER_DESC sampler{};
@@ -998,13 +1058,7 @@ void GraphicsPipeline::RootSignatureCopyImageCreate()
 	desc.pStaticSamplers = &sampler;
 	desc.NumStaticSamplers = 1;
 
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	assert(SUCCEEDED(hr));
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureCopyImage));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, desc, rootSignatureCopyImage, "GraphicsPipeline::RootSignatureCopyImageCreate");
 
 }
 
@@ -1014,6 +1068,9 @@ void GraphicsPipeline::RootSignatureCopyImageCreate()
 void GraphicsPipeline::CreateSkybox()
 {
 	RootSignatureSkyboxCreate();
+	if (rootSignatureSkybox == nullptr) {
+		return;
+	}
 
 	//InputLayout
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
@@ -1061,11 +1118,15 @@ void GraphicsPipeline::CreateSkybox()
 	//shaderをコンパイルする
 	IDxcBlob* vertexshaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Skybox.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexshaderBlob != nullptr);
+	if (!EnsureShaderBlob(vertexshaderBlob, "GraphicsPipeline::CreateSkybox", L"Resources/Shaders/Skybox.VS.hlsl")) {
+		return;
+	}
 
 	IDxcBlob* pixelShaderBlob = dxCommon_->CompileShader(L"Resources/Shaders/Skybox.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!EnsureShaderBlob(pixelShaderBlob, "GraphicsPipeline::CreateSkybox", L"Resources/Shaders/Skybox.PS.hlsl")) {
+		return;
+	}
 
 	//DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -1100,9 +1161,7 @@ void GraphicsPipeline::CreateSkybox()
 	graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
 	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 	//実際に生成
-	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(&graphicsPipelineStateSkybox));
-	assert(SUCCEEDED(hr));
+	CreatePipelineStateSafely(dxCommon_, graphicsPipelineStateDesc, graphicsPipelineStateSkybox, "GraphicsPipeline::CreateSkybox");
 
 }
 
@@ -1160,20 +1219,7 @@ void GraphicsPipeline::RootSignatureSkyboxCreate()
 
 
 
-	//シリアライズしてバイナリする
-	ID3DBlob* signatureBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-
-		Logger::Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
-		assert(false);
-
-	}
-	//バイナリをもとに生成
-
-	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignatureSkybox));
-	assert(SUCCEEDED(hr));
+	CreateRootSignatureSafely(dxCommon_, descriptionRootSignature, rootSignatureSkybox, "GraphicsPipeline::RootSignatureSkyboxCreate");
 
 }
 
