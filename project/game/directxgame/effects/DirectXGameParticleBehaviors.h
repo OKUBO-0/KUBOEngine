@@ -27,4 +27,10 @@ private:
 	Vector4 color_{ 1.0f, 0.35f, 0.25f, 1.0f };
 };
 
+class ConfettiParticleBehavior : public Engine::Particle::IParticleBehavior {
+public:
+	Engine::Particle::Particle Create(std::mt19937& rng, const Vector3& pos) override;
+	void Update(Engine::Particle::Particle& particle, float dt, Engine::Math::Material* materialData) override;
+};
+
 } // namespace DirectXGame

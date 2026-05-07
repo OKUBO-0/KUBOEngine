@@ -1,6 +1,5 @@
 #include "game/directxgame/scene/DirectXGameScene.h"
 #include "game/directxgame/core/DirectXGameDataPaths.h"
-#include "game/directxgame/core/GameSpriteFactory.h"
 #include "game/directxgame/core/DirectXGameSceneId.h"
 #include "game/directxgame/core/DirectXGameSessionContext.h"
 #include "game/directxgame/core/UILayoutIO.h"
@@ -28,7 +27,6 @@ constexpr char kAudioPauseToggle[] = "game.pauseToggle";
 constexpr char kAudioLevelUp[] = "game.levelUp";
 constexpr char kAudioDeath[] = "game.death";
 constexpr float kLevelUpSlideSpeed = 4200.0f;
-constexpr float kLevelUpConfettiGravity = 980.0f;
 
 bool IsConfirmTriggered()
 {
@@ -317,6 +315,12 @@ void DirectXGameScene::InitializeParticles()
 		Engine::Particle::VerticesType::Quad,
 		std::make_unique<SparkParticleBehavior>());
 	particleManager->SetBehavior("DirectXGame.Spark", std::make_unique<SparkParticleBehavior>());
+	particleManager->CreateParticleGroup(
+		"DirectXGame.Confetti",
+		"Resources/DirectXGame/white1x1.png",
+		Engine::Particle::VerticesType::Quad,
+		std::make_unique<ConfettiParticleBehavior>());
+	particleManager->SetBehavior("DirectXGame.Confetti", std::make_unique<ConfettiParticleBehavior>());
 }
 
 void DirectXGameScene::UpdateGamePlay(float deltaTime)
@@ -354,22 +358,22 @@ void DirectXGameScene::UpdateEffects()
 	const Vector3 playerPosition = player_->GetWorldPosition();
 	const int32_t hp = playerManager_->GetHP();
 	if (hp < previousEffectHp_) {
-		particleManager->Emit("DirectXGame.Spark", playerPosition, 18);
-		particleManager->Emit("DirectXGame.Ripple", playerPosition, 1);
+		particleManager->Emit("DirectXGame.Spark", playerPosition, static_cast<uint32_t>((std::max)(0, particleTuning_.playerDamageSparkCount)));
+		particleManager->Emit("DirectXGame.Ripple", playerPosition, static_cast<uint32_t>((std::max)(0, particleTuning_.playerDamageRippleCount)));
 	}
 	previousEffectHp_ = hp;
 
 	const int32_t totalExp = playerManager_->GetTotalEXP();
 	if (totalExp > previousEffectTotalExp_) {
-		particleManager->Emit("DirectXGame.Ripple", playerPosition, 1);
+		particleManager->Emit("DirectXGame.Ripple", playerPosition, static_cast<uint32_t>((std::max)(0, particleTuning_.expRippleCount)));
 	}
 	previousEffectTotalExp_ = totalExp;
 
 	const float lightningTimer = playerManager_->GetLightningEffectTimer();
 	if (lightningTimer > previousLightningEffectTimer_) {
 		for (const Vector3& target : playerManager_->GetLightningEffectTargets()) {
-			particleManager->Emit("DirectXGame.Spark", target, 14);
-			particleManager->Emit("DirectXGame.Ripple", target, 1);
+			particleManager->Emit("DirectXGame.Spark", target, static_cast<uint32_t>((std::max)(0, particleTuning_.lightningSparkCount)));
+			particleManager->Emit("DirectXGame.Ripple", target, static_cast<uint32_t>((std::max)(0, particleTuning_.lightningRippleCount)));
 		}
 	}
 	previousLightningEffectTimer_ = lightningTimer;
@@ -448,7 +452,6 @@ void DirectXGameScene::UpdateUi(float deltaTime)
 
 	if (gameState_ == GameState::LevelUp) {
 		UpdateLevelUpAnimation(deltaTime);
-		UpdateLevelUpConfetti(deltaTime);
 		if (levelUpAnimationState_ != LevelUpAnimationState::Idle) {
 			return;
 		}
@@ -497,7 +500,6 @@ void DirectXGameScene::DrawUi()
 		pauseCursor_.Draw();
 	} else if (gameState_ == GameState::LevelUp) {
 		levelUpOverlay_.Draw();
-		DrawLevelUpConfetti();
 		for (UILabel& choiceSprite : levelUpChoiceSprites_) {
 			choiceSprite.Draw();
 		}
@@ -553,7 +555,6 @@ void DirectXGameScene::UpdateLevelUpAnimation(float deltaTime)
 				levelUpSelectionPending_ = false;
 			}
 			levelUpAnimationState_ = LevelUpAnimationState::Hidden;
-			levelUpConfetti_.clear();
 			EnterPlaying();
 		}
 		break;
@@ -561,34 +562,6 @@ void DirectXGameScene::UpdateLevelUpAnimation(float deltaTime)
 	case LevelUpAnimationState::Hidden:
 	default:
 		break;
-	}
-}
-
-void DirectXGameScene::UpdateLevelUpConfetti(float deltaTime)
-{
-	for (auto it = levelUpConfetti_.begin(); it != levelUpConfetti_.end();) {
-		it->age += deltaTime;
-		if (it->age >= it->lifetime) {
-			it = levelUpConfetti_.erase(it);
-			continue;
-		}
-
-		it->velocity.y += kLevelUpConfettiGravity * deltaTime;
-		it->position.x += it->velocity.x * deltaTime;
-		it->position.y += it->velocity.y * deltaTime;
-		it->rotation += it->angularVelocity * deltaTime;
-
-		if (it->sprite) {
-			const float alpha = 1.0f - (it->age / it->lifetime);
-			Vector4 color = it->color;
-			color.w *= alpha;
-			it->sprite->SetColor(color);
-			it->sprite->SetPosition(it->position);
-			it->sprite->SetRotation(it->rotation);
-			it->sprite->Update();
-		}
-
-		++it;
 	}
 }
 
@@ -600,15 +573,6 @@ void DirectXGameScene::DrawPauseBuildUi()
 
 	for (UILabel& icon : pauseBuildIcons_) {
 		icon.Draw();
-	}
-}
-
-void DirectXGameScene::DrawLevelUpConfetti()
-{
-	for (ConfettiParticle& particle : levelUpConfetti_) {
-		if (particle.sprite) {
-			particle.sprite->Draw();
-		}
 	}
 }
 
@@ -802,46 +766,14 @@ void DirectXGameScene::ApplyLevelUpLayout()
 
 void DirectXGameScene::SpawnLevelUpConfetti()
 {
-	levelUpConfetti_.clear();
-
-	static std::mt19937 rng{ std::random_device{}() };
-	std::uniform_real_distribution<float> spawnXDist(120.0f, 1160.0f);
-	std::uniform_real_distribution<float> velocityXDist(-180.0f, 180.0f);
-	std::uniform_real_distribution<float> velocityYDist(-980.0f, -520.0f);
-	std::uniform_real_distribution<float> sizeXDist(8.0f, 18.0f);
-	std::uniform_real_distribution<float> sizeYDist(14.0f, 30.0f);
-	std::uniform_real_distribution<float> rotationDist(0.0f, 6.28318f);
-	std::uniform_real_distribution<float> angularVelocityDist(-7.0f, 7.0f);
-	std::uniform_real_distribution<float> lifetimeDist(0.8f, 1.5f);
-	std::uniform_int_distribution<int> colorIndexDist(0, 5);
-
-	constexpr std::array<Vector4, 6> kColors{
-		Vector4{ 1.0f, 0.35f, 0.35f, 1.0f },
-		Vector4{ 1.0f, 0.82f, 0.22f, 1.0f },
-		Vector4{ 0.35f, 0.86f, 0.52f, 1.0f },
-		Vector4{ 0.30f, 0.72f, 1.0f, 1.0f },
-		Vector4{ 0.98f, 0.52f, 0.88f, 1.0f },
-		Vector4{ 1.0f, 1.0f, 1.0f, 1.0f },
-	};
-
-	constexpr int32_t kParticleCount = 28;
-	levelUpConfetti_.reserve(kParticleCount);
-	for (int32_t index = 0; index < kParticleCount; ++index) {
-		ConfettiParticle particle;
-		particle.position = { spawnXDist(rng), 744.0f };
-		particle.velocity = { velocityXDist(rng), velocityYDist(rng) };
-		particle.size = { sizeXDist(rng), sizeYDist(rng) };
-		particle.rotation = rotationDist(rng);
-		particle.angularVelocity = angularVelocityDist(rng);
-		particle.lifetime = lifetimeDist(rng);
-		particle.color = kColors[static_cast<size_t>(colorIndexDist(rng))];
-		particle.sprite = GameSpriteFactory::Create("white1x1.png", particle.position);
-		particle.sprite->SetSize(particle.size);
-		particle.sprite->SetAnchorPoint({ 0.5f, 0.5f });
-		particle.sprite->SetRotation(particle.rotation);
-		particle.sprite->SetColor(particle.color);
-		levelUpConfetti_.push_back(std::move(particle));
+	if (!player_) {
+		return;
 	}
+
+	Engine::Particle::ParticleManager::GetInstance()->Emit(
+		"DirectXGame.Confetti",
+		player_->GetWorldPosition(),
+		static_cast<uint32_t>((std::max)(0, particleTuning_.levelUpConfettiCount)));
 }
 
 void DirectXGameScene::MoveMenuSelection(int32_t delta)
@@ -942,7 +874,7 @@ void DirectXGameScene::UpdateDebugUi()
 	}
 
 	ImGui::Begin("DirectXGame Game");
-	ImGui::Text("Stage 14 visual / debug draw scene");
+	ImGui::Text("Stage 17.1 particle tuning scene");
 	ImGui::Text("Input Device: %s", GameInputBindings::ToDisplayName(navigationInputDevice_));
 	ImGui::Text("WASD / Left Stick: Move");
 	ImGui::Text("Mouse / Right Stick: Aim");
@@ -1052,6 +984,24 @@ void DirectXGameScene::UpdateDebugUi()
 		ImGui::Separator();
 		ImGui::Checkbox("DebugDraw collision / spawn range", &debugDrawEnabled_);
 		ImGui::Text("Hit Flash: %.2f  Death Timer: %.2f", hitFlashTimer_, deathTimer_);
+		if (ImGui::CollapsingHeader("Particle Tuning")) {
+			ImGui::SliderInt("Damage Spark Count", &particleTuning_.playerDamageSparkCount, 0, 100);
+			ImGui::SliderInt("Damage Ripple Count", &particleTuning_.playerDamageRippleCount, 0, 12);
+			ImGui::SliderInt("EXP Ripple Count", &particleTuning_.expRippleCount, 0, 12);
+			ImGui::SliderInt("Lightning Spark Count", &particleTuning_.lightningSparkCount, 0, 100);
+			ImGui::SliderInt("Lightning Ripple Count", &particleTuning_.lightningRippleCount, 0, 12);
+			ImGui::SliderInt("LevelUp Confetti Count", &particleTuning_.levelUpConfettiCount, 0, 160);
+			if (ImGui::Button("Emit Player Spark") && player_) {
+				Engine::Particle::ParticleManager::GetInstance()->Emit(
+					"DirectXGame.Spark",
+					player_->GetWorldPosition(),
+					static_cast<uint32_t>((std::max)(0, particleTuning_.playerDamageSparkCount)));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Emit LevelUp Confetti")) {
+				SpawnLevelUpConfetti();
+			}
+		}
 		timer_.DebugDrawImGui();
 		hpGauge_.DebugDrawImGui();
 		expGauge_.DebugDrawImGui();

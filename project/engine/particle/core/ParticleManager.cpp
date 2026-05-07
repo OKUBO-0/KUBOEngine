@@ -101,7 +101,7 @@ void ParticleManager::UpdateAliveParticle(Particle& particle, ParticleGroup& par
 	Matrix4x4 worldViewProjectionMatrix = worldMatrix * viewMatrix * projectionMatrix;
 
 	// 生存中インスタンスだけを前から詰めて書き込み、残りは描画対象から外す
-	if (counter < particleGroup.instanceCount) {
+	if (counter < kMaxParticleInstanceCount) {
 		particleGroup.instanceData[counter].WVP = worldViewProjectionMatrix;
 		particleGroup.instanceData[counter].World = worldMatrix;
 		particleGroup.instanceData[counter].color = particle.color;

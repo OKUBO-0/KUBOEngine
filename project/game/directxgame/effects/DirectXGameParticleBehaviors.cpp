@@ -1,5 +1,6 @@
 #include "game/directxgame/effects/DirectXGameParticleBehaviors.h"
 #include "ParticleManager.h"
+#include <array>
 #include <numbers>
 
 namespace DirectXGame {
@@ -8,7 +9,17 @@ namespace {
 
 constexpr float kRippleLifetime = 0.42f;
 constexpr float kSparkLifetime = 0.35f;
+constexpr float kConfettiLifetimeMin = 0.85f;
+constexpr float kConfettiLifetimeMax = 1.45f;
 constexpr float kGroundY = -1.82f;
+constexpr std::array<Vector4, 6> kConfettiColors{
+	Vector4{ 1.0f, 0.35f, 0.35f, 1.0f },
+	Vector4{ 1.0f, 0.82f, 0.22f, 1.0f },
+	Vector4{ 0.35f, 0.86f, 0.52f, 1.0f },
+	Vector4{ 0.30f, 0.72f, 1.0f, 1.0f },
+	Vector4{ 0.98f, 0.52f, 0.88f, 1.0f },
+	Vector4{ 1.0f, 1.0f, 1.0f, 1.0f },
+};
 
 }
 
@@ -70,6 +81,40 @@ void SparkParticleBehavior::Update(Engine::Particle::Particle& particle, float d
 {
 	particle.transform.translate += particle.Velocity * (dt / (1.0f / 60.0f));
 	particle.Velocity.y -= 0.012f;
+	particle.currentTime += dt;
+}
+
+Engine::Particle::Particle ConfettiParticleBehavior::Create(std::mt19937& rng, const Vector3& pos)
+{
+	std::uniform_real_distribution<float> offsetDist(-5.5f, 5.5f);
+	std::uniform_real_distribution<float> velocityXDist(-0.16f, 0.16f);
+	std::uniform_real_distribution<float> velocityYDist(0.18f, 0.34f);
+	std::uniform_real_distribution<float> velocityZDist(-0.12f, 0.12f);
+	std::uniform_real_distribution<float> scaleXDist(0.12f, 0.24f);
+	std::uniform_real_distribution<float> scaleYDist(0.28f, 0.52f);
+	std::uniform_real_distribution<float> rotateDist(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
+	std::uniform_real_distribution<float> lifetimeDist(kConfettiLifetimeMin, kConfettiLifetimeMax);
+	std::uniform_int_distribution<size_t> colorIndexDist(0, kConfettiColors.size() - 1);
+
+	Engine::Particle::Particle particle{};
+	particle.transform.scale = { scaleXDist(rng), scaleYDist(rng), 1.0f };
+	particle.transform.rotate = { rotateDist(rng), rotateDist(rng), rotateDist(rng) };
+	particle.transform.translate = { pos.x + offsetDist(rng), pos.y + 1.2f, pos.z + offsetDist(rng) };
+	particle.Velocity = { velocityXDist(rng), velocityYDist(rng), velocityZDist(rng) };
+	particle.color = kConfettiColors[colorIndexDist(rng)];
+	particle.lifetime = lifetimeDist(rng);
+	particle.currentTime = 0.0f;
+	return particle;
+}
+
+void ConfettiParticleBehavior::Update(Engine::Particle::Particle& particle, float dt, Engine::Math::Material* /*materialData*/)
+{
+	const float fixedStepScale = dt / (1.0f / 60.0f);
+	particle.transform.translate += particle.Velocity * fixedStepScale;
+	particle.Velocity.y -= 0.010f;
+	particle.transform.rotate.x += 0.13f * fixedStepScale;
+	particle.transform.rotate.y += 0.09f * fixedStepScale;
+	particle.transform.rotate.z += 0.17f * fixedStepScale;
 	particle.currentTime += dt;
 }
 

@@ -45,10 +45,8 @@ private:
 	void UpdateUi(float deltaTime);
 	void UpdatePauseBuildUi();
 	void UpdateLevelUpAnimation(float deltaTime);
-	void UpdateLevelUpConfetti(float deltaTime);
 	void DrawUi();
 	void DrawPauseBuildUi();
-	void DrawLevelUpConfetti();
 	void SavePauseBuildLayout() const;
 	void EnterPlaying();
 	void TogglePause();
@@ -106,16 +104,13 @@ private:
 		bool debugEnabled = false;
 	};
 
-	struct ConfettiParticle {
-		std::unique_ptr<Engine::Graphics2D::Sprite> sprite;
-		Vector2 position{};
-		Vector2 velocity{};
-		Vector2 size{};
-		Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
-		float rotation = 0.0f;
-		float angularVelocity = 0.0f;
-		float lifetime = 0.0f;
-		float age = 0.0f;
+	struct ParticleTuning {
+		int32_t playerDamageSparkCount = 18;
+		int32_t playerDamageRippleCount = 1;
+		int32_t expRippleCount = 1;
+		int32_t lightningSparkCount = 14;
+		int32_t lightningRippleCount = 1;
+		int32_t levelUpConfettiCount = 56;
 	};
 
 	std::shared_ptr<DirectXGameSessionContext> sessionContext_;
@@ -142,8 +137,8 @@ private:
 	std::array<UILabel, 3> levelUpChoiceSprites_;
 	std::array<UILabel, 5> pauseBuildIcons_;
 	std::vector<LevelUpChoice> levelUpChoices_;
-	std::vector<ConfettiParticle> levelUpConfetti_;
 	PauseBuildLayout pauseBuildLayout_{};
+	ParticleTuning particleTuning_{};
 	SoundHandle startSeHandle_ = 0;
 	SoundHandle pauseSeHandle_ = 0;
 	SoundHandle levelUpSeHandle_ = 0;
