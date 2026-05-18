@@ -35,22 +35,44 @@ ModelHandle& GetNextHandle()
 
 std::string ResolveModelFileName(const std::string& modelName)
 {
+	const std::filesystem::path resourceRoot = ResourcePaths::GetModelResourceRoot();
 	const std::filesystem::path requestedPath(modelName);
+
+	const std::filesystem::path directPath = resourceRoot / requestedPath;
+	if (std::filesystem::exists(directPath)) {
+		return requestedPath.generic_string();
+	}
+
+	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(resourceRoot)) {
+		if (!entry.is_regular_file()) {
+			continue;
+		}
+		const std::filesystem::path relativePath = std::filesystem::relative(entry.path(), resourceRoot);
+		if (!relativePath.empty() && *relativePath.begin() == "models") {
+			continue;
+		}
+		const bool matchesStem = !requestedPath.has_extension() && entry.path().stem() == modelName;
+		const bool matchesFileName = requestedPath.has_extension() && entry.path().filename() == requestedPath.filename();
+		if (matchesStem || matchesFileName) {
+			return relativePath.generic_string();
+		}
+	}
+
 	if (requestedPath.has_extension()) {
 		return requestedPath.filename().generic_string();
 	}
 
-	const std::filesystem::path modelRoot = std::filesystem::path(ResourcePaths::GetModelResourceRoot()) / "models";
+	const std::filesystem::path modelRoot = resourceRoot / "models";
 	for (const std::filesystem::directory_entry& entry : std::filesystem::recursive_directory_iterator(modelRoot)) {
 		if (!entry.is_regular_file()) {
 			continue;
 		}
 		if (entry.path().stem() == modelName) {
-			return entry.path().filename().generic_string();
+			return std::filesystem::relative(entry.path(), modelRoot).generic_string();
 		}
 	}
 
-	return modelName;
+	return requestedPath.generic_string();
 }
 
 }

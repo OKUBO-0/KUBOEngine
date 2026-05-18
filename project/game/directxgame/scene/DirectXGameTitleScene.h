@@ -10,6 +10,7 @@
 #include "game/directxgame/core/GameLightSettings.h"
 #include "game/directxgame/effects/CurtainTransition.h"
 #include "game/directxgame/ui/common/UILabel.h"
+#include "game/directxgame/world/GridPlane.h"
 #include <cstdint>
 #include <memory>
 
@@ -44,8 +45,14 @@ private:
 		float menuHitboxStepY = 128.0f;
 		Vector2 guidePosition{ 0.0f, 0.0f };
 		Vector2 guideSize{ 1280.0f, 720.0f };
-		Vector3 modelBasePosition{ 20.0f, -5.0f, 0.0f };
+		Vector3 modelBasePosition{ -18.0f, 1.2f, 8.0f };
 		Vector3 modelScale{ 4.5f, 4.5f, 4.5f };
+		Vector3 cameraTarget{ 0.0f, 1.0f, 0.0f };
+		float cameraDistance = 76.0f;
+		float cameraHeight = 44.0f;
+		float cameraPitch = 0.48f;
+		float cameraYaw = 0.0f;
+		float cameraOrbitSpeed = 0.12f;
 		bool debugEnabled = false;
 	};
 
@@ -58,6 +65,8 @@ private:
 	void UpdateNavigation();
 	void UpdateAudio();
 	void UpdateModelAnimation();
+	void UpdatePlayerLight();
+	void UpdateCameraAnimation();
 	void DrawDebugUi();
 
 	bool IsMouseMenuConfirm(int32_t hoveredMenuIndex) const;
@@ -75,7 +84,9 @@ private:
 	std::unique_ptr<Engine::CameraSystem::Camera> titleCamera_;
 	std::unique_ptr<Engine::Graphics3D::Object3D> titleObject_;
 	std::unique_ptr<Engine::Graphics3D::Object3D> skyDomeObject_;
+	std::unique_ptr<GridPlane> gridPlane_;
 	GameLightSettings lightSettings_{};
+	Vector3 titleLightOffset_ = GameLightDefaults::kPlayerLightOffset;
 
 	SoundHandle titleBgmHandle_ = 0;
 	SoundHandle selectSeHandle_ = 0;

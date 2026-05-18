@@ -5,6 +5,9 @@
 #include <Windows.h>
 #include <algorithm>
 #include <cmath>
+#ifdef _DEBUG
+#include <imgui.h>
+#endif
 
 namespace DirectXGame::GameInputBindings {
 
@@ -20,10 +23,20 @@ inline float ClampAxis(float value)
 	return std::clamp(value, -1.0f, 1.0f);
 }
 
+inline bool IsGameInputSuppressedByImGui()
+{
+#ifdef _DEBUG
+	const ImGuiIO& io = ImGui::GetIO();
+	return io.WantCaptureMouse || io.WantCaptureKeyboard || ImGui::IsAnyItemActive();
+#else
+	return false;
+#endif
+}
+
 inline Vector2 GetMoveVector(Engine::InputSystem::Input* input)
 {
 	Vector2 move{ 0.0f, 0.0f };
-	if (!input) {
+	if (!input || IsGameInputSuppressedByImGui()) {
 		return move;
 	}
 
@@ -52,7 +65,7 @@ inline Vector2 GetMoveVector(Engine::InputSystem::Input* input)
 
 inline bool GetAimVector(Engine::InputSystem::Input* input, Vector2& outAim)
 {
-	if (!input) {
+	if (!input || IsGameInputSuppressedByImGui()) {
 		return false;
 	}
 
@@ -69,7 +82,7 @@ inline bool GetAimVector(Engine::InputSystem::Input* input, Vector2& outAim)
 
 inline bool HasMouseNavigationInput(Engine::InputSystem::Input* input)
 {
-	if (!input) {
+	if (!input || IsGameInputSuppressedByImGui()) {
 		return false;
 	}
 
@@ -79,7 +92,7 @@ inline bool HasMouseNavigationInput(Engine::InputSystem::Input* input)
 
 inline bool HasKeyboardNavigationInput(Engine::InputSystem::Input* input)
 {
-	return input && (
+	return input && !IsGameInputSuppressedByImGui() && (
 		input->PushKey(DIK_W) ||
 		input->PushKey(DIK_A) ||
 		input->PushKey(DIK_S) ||
@@ -96,7 +109,7 @@ inline bool HasKeyboardNavigationInput(Engine::InputSystem::Input* input)
 
 inline bool HasGamepadNavigationInput(Engine::InputSystem::Input* input)
 {
-	if (!input) {
+	if (!input || IsGameInputSuppressedByImGui()) {
 		return false;
 	}
 
@@ -189,62 +202,82 @@ inline const char* GetPauseLabel(NavigationInputDevice device)
 
 inline bool IsMouseConfirmTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerMouse(0);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerMouse(0);
 }
 
 inline bool IsMouseCancelTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerMouse(1);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerMouse(1);
 }
 
 inline bool IsKeyboardMenuUpTriggered(Engine::InputSystem::Input* input)
 {
-	return input && (input->TriggerKey(DIK_W) || input->TriggerKey(DIK_UP));
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerKey(DIK_W) || input->TriggerKey(DIK_UP));
 }
 
 inline bool IsKeyboardMenuDownTriggered(Engine::InputSystem::Input* input)
 {
-	return input && (input->TriggerKey(DIK_S) || input->TriggerKey(DIK_DOWN));
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerKey(DIK_S) || input->TriggerKey(DIK_DOWN));
+}
+
+inline bool IsKeyboardMenuLeftTriggered(Engine::InputSystem::Input* input)
+{
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerKey(DIK_A) || input->TriggerKey(DIK_LEFT));
+}
+
+inline bool IsKeyboardMenuRightTriggered(Engine::InputSystem::Input* input)
+{
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerKey(DIK_D) || input->TriggerKey(DIK_RIGHT));
 }
 
 inline bool IsKeyboardConfirmTriggered(Engine::InputSystem::Input* input)
 {
-	return input && (input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE));
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE));
 }
 
 inline bool IsKeyboardCancelTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerKey(DIK_ESCAPE);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerKey(DIK_ESCAPE);
 }
 
 inline bool IsKeyboardPauseTriggered(Engine::InputSystem::Input* input)
 {
-	return input && (input->TriggerKey(DIK_ESCAPE) || input->TriggerKey(DIK_P));
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerKey(DIK_ESCAPE) || input->TriggerKey(DIK_P));
 }
 
 inline bool IsGamepadMenuUpTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerGamePadButton(XINPUT_GAMEPAD_DPAD_UP);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerGamePadButton(XINPUT_GAMEPAD_DPAD_UP);
 }
 
 inline bool IsGamepadMenuDownTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerGamePadButton(XINPUT_GAMEPAD_DPAD_DOWN);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerGamePadButton(XINPUT_GAMEPAD_DPAD_DOWN);
+}
+
+inline bool IsGamepadMenuLeftTriggered(Engine::InputSystem::Input* input)
+{
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerGamePadButton(XINPUT_GAMEPAD_DPAD_LEFT);
+}
+
+inline bool IsGamepadMenuRightTriggered(Engine::InputSystem::Input* input)
+{
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerGamePadButton(XINPUT_GAMEPAD_DPAD_RIGHT);
 }
 
 inline bool IsGamepadConfirmTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerGamePadButton(XINPUT_GAMEPAD_A);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerGamePadButton(XINPUT_GAMEPAD_A);
 }
 
 inline bool IsGamepadCancelTriggered(Engine::InputSystem::Input* input)
 {
-	return input && input->TriggerGamePadButton(XINPUT_GAMEPAD_B);
+	return input && !IsGameInputSuppressedByImGui() && input->TriggerGamePadButton(XINPUT_GAMEPAD_B);
 }
 
 inline bool IsGamepadPauseTriggered(Engine::InputSystem::Input* input)
 {
-	return input && (input->TriggerGamePadButton(XINPUT_GAMEPAD_START) || input->TriggerGamePadButton(XINPUT_GAMEPAD_BACK));
+	return input && !IsGameInputSuppressedByImGui() && (input->TriggerGamePadButton(XINPUT_GAMEPAD_START) || input->TriggerGamePadButton(XINPUT_GAMEPAD_BACK));
 }
 
 inline bool IsMenuUpTriggered(Engine::InputSystem::Input* input)
@@ -255,6 +288,16 @@ inline bool IsMenuUpTriggered(Engine::InputSystem::Input* input)
 inline bool IsMenuDownTriggered(Engine::InputSystem::Input* input)
 {
 	return IsKeyboardMenuDownTriggered(input) || IsGamepadMenuDownTriggered(input);
+}
+
+inline bool IsMenuLeftTriggered(Engine::InputSystem::Input* input)
+{
+	return IsKeyboardMenuLeftTriggered(input) || IsGamepadMenuLeftTriggered(input);
+}
+
+inline bool IsMenuRightTriggered(Engine::InputSystem::Input* input)
+{
+	return IsKeyboardMenuRightTriggered(input) || IsGamepadMenuRightTriggered(input);
 }
 
 inline bool IsUiConfirmTriggered(Engine::InputSystem::Input* input)

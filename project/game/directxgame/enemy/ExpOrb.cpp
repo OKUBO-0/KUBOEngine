@@ -12,6 +12,13 @@ namespace {
 constexpr char kEnvironmentTexturePath[] = "Resources/textures/skybox/test.dds";
 constexpr char kPickupSePath[] = "audio/se/se_exp.wav";
 constexpr char kAudioExpPickup[] = "combat.expPickup";
+constexpr float kFrameDeltaBaseline = 0.016f;
+constexpr float kAttractRadiusSq = 70.0f;
+constexpr float kCollectRadiusSq = 4.0f;
+constexpr float kAttractBaseSpeed = 36.0f;
+constexpr float kAttractDistanceSpeed = 4.0f;
+constexpr float kHorizontalScatterDamping = 0.95f;
+constexpr float kVerticalDamping = 0.95f;
 
 }
 
@@ -49,38 +56,37 @@ void ExpOrb::Update(const Vector3& playerPosition, float deltaTime)
 		return;
 	}
 
-	const float velocityScale = deltaTime / 0.016f;
+	const float velocityScale = deltaTime / kFrameDeltaBaseline;
 	const float dx = playerPosition.x - position_.x;
 	const float dz = playerPosition.z - position_.z;
 	const float distanceSq = dx * dx + dz * dz;
 
-	if (distanceSq < 70.0f) {
+	if (distanceSq < kAttractRadiusSq) {
 		const float distance = std::sqrt(distanceSq);
 		if (distance > 0.001f) {
-			velocity_.x += (dx / distance) * 0.05f * velocityScale;
-			velocity_.z += (dz / distance) * 0.05f * velocityScale;
+			const float attractSpeed = kAttractBaseSpeed + distance * kAttractDistanceSpeed;
+			const float attractStep = (std::min)(distance, attractSpeed * deltaTime);
+			position_.x += (dx / distance) * attractStep;
+			position_.z += (dz / distance) * attractStep;
 		}
+		velocity_.x *= kHorizontalScatterDamping;
+		velocity_.z *= kHorizontalScatterDamping;
+	} else {
+		position_.x += velocity_.x * velocityScale;
+		position_.z += velocity_.z * velocityScale;
+		velocity_.x *= kHorizontalScatterDamping;
+		velocity_.z *= kHorizontalScatterDamping;
 	}
 
-	position_.x += velocity_.x * velocityScale;
 	position_.y += velocity_.y * velocityScale;
-	position_.z += velocity_.z * velocityScale;
 	position_.y = (std::max)(0.35f, position_.y);
-	velocity_.x *= 0.95f;
-	velocity_.y *= 0.95f;
-	velocity_.z *= 0.95f;
+	velocity_.y *= kVerticalDamping;
 	spin_ += deltaTime * 3.0f;
 
-	if (distanceSq < 4.0f) {
-		static SoundHandle sharedPickupSeHandle = 0;
-		if (sharedPickupSeHandle == 0) {
-			sharedPickupSeHandle = GameAudioCache::LoadWave(kPickupSePath);
-		}
-		if (sharedPickupSeHandle != 0) {
-			GameAudioCache::Play(sharedPickupSeHandle);
-			GameAudioCache::SetVolumeFromTuning(sharedPickupSeHandle, kAudioExpPickup, 1.0f);
-		}
-		active_ = false;
+	const float collectDx = playerPosition.x - position_.x;
+	const float collectDz = playerPosition.z - position_.z;
+	if (collectDx * collectDx + collectDz * collectDz < kCollectRadiusSq) {
+		Collect();
 		return;
 	}
 
@@ -103,6 +109,19 @@ void ExpOrb::SetLightSettings(const GameLightSettings& lightSettings)
 	if (object_) {
 		lightSettings_.ApplyTo(*object_);
 	}
+}
+
+void ExpOrb::Collect()
+{
+	static SoundHandle sharedPickupSeHandle = 0;
+	if (sharedPickupSeHandle == 0) {
+		sharedPickupSeHandle = GameAudioCache::LoadWave(kPickupSePath);
+	}
+	if (sharedPickupSeHandle != 0) {
+		GameAudioCache::Play(sharedPickupSeHandle);
+		GameAudioCache::SetVolumeFromTuning(sharedPickupSeHandle, kAudioExpPickup, 1.0f);
+	}
+	active_ = false;
 }
 
 void ExpOrb::ApplyTransform()

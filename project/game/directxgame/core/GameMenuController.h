@@ -25,11 +25,12 @@ public:
 		state.pause = GameInputBindings::IsKeyboardPauseTriggered(input) ||
 			GameInputBindings::IsGamepadPauseTriggered(input);
 
-		if (GameInputBindings::IsMenuUpTriggered(input)) {
-			state.moveDelta -= 1;
-		}
-		if (GameInputBindings::IsMenuDownTriggered(input)) {
-			state.moveDelta += 1;
+		const bool previous = GameInputBindings::IsMenuUpTriggered(input) ||
+			GameInputBindings::IsMenuLeftTriggered(input);
+		const bool next = GameInputBindings::IsMenuDownTriggered(input) ||
+			GameInputBindings::IsMenuRightTriggered(input);
+		if (previous != next) {
+			state.moveDelta = previous ? -1 : 1;
 		}
 		return state;
 	}

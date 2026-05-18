@@ -6,7 +6,13 @@ cursorBasePosition,0,0
 menuHitboxSize,300,88
 menuHitboxStepY,128
 menuHitboxPosition,145,340
-modelBasePosition,10,-3,0
+modelBasePosition,-18,1.2,8
 cursorStepY,120
 guideSize,1280,720
-modelScale,3,3,3
+modelScale,4.5,4.5,4.5
+cameraTarget,0,1,0
+cameraDistance,76
+cameraHeight,44
+cameraPitch,0.48
+cameraYaw,0
+cameraOrbitSpeed,0.12

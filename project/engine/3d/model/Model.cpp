@@ -22,6 +22,12 @@ Engine::Graphics3D::ModelLoadDiagnostics g_modelLoadDiagnostics{};
 
 std::string ResolveModelFilePath(const std::string& directoryPath, const std::string& filename)
 {
+    const std::filesystem::path resourceRoot = directoryPath;
+    const std::filesystem::path resourceDirectPath = resourceRoot / filename;
+    if (std::filesystem::exists(resourceDirectPath)) {
+        return resourceDirectPath.generic_string();
+    }
+
     const std::filesystem::path modelRoot = std::filesystem::path(directoryPath) / "models";
     const std::filesystem::path directPath = modelRoot / filename;
     if (std::filesystem::exists(directPath)) {

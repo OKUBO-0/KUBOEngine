@@ -17,6 +17,11 @@ public:
 		TopDown,
 	};
 
+	enum class AimInputDevice {
+		KeyboardMouse,
+		Gamepad,
+	};
+
 	void Initialize();
 	void Update(float deltaTime);
 	void Draw();
@@ -31,6 +36,7 @@ public:
 	float GetCameraPitch() const { return cameraPitch_; }
 	CameraMode GetCameraMode() const { return cameraMode_; }
 	bool IsMouseAimEnabled() const { return mouseAimEnabled_; }
+	AimInputDevice GetAimInputDevice() const { return aimInputDevice_; }
 	void SetCameraHeight(float height) { cameraHeight_ = height; }
 	void SetCameraDistance(float distance) { cameraDistance_ = distance; }
 	void SetCameraPitch(float pitch) { cameraPitch_ = pitch; }
@@ -57,6 +63,7 @@ private:
 	float cameraPitch_ = 1.0f;
 	CameraMode cameraMode_ = CameraMode::WorldBack;
 	bool mouseAimEnabled_ = true;
+	AimInputDevice aimInputDevice_ = AimInputDevice::KeyboardMouse;
 
 	std::unique_ptr<Engine::CameraSystem::Camera> camera_;
 	std::unique_ptr<Engine::Graphics3D::Object3D> playerObject_;

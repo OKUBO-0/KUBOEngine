@@ -234,6 +234,7 @@ void Object3D::UpdateTransformationMatrices()
 {
 	worldMatrix = MyMath::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 	transformationMatrixData_->World = worldMatrix;
+	transformationMatrixData_->worldInverseTranspose = MyMath::Transpose(worldMatrix.Inverse());
 
 	Engine::CameraSystem::Camera* activeCamera = Engine::CameraSystem::CameraManager::GetInstance()->GetActiveCamera();
 	if (!activeCamera) {

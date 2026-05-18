@@ -78,7 +78,7 @@ void Player::InitializeObjects()
 {
 	Engine::Base::TextureManager::GetInstance()->LoadTexture(kEnvironmentTexturePath);
 
-	const ModelHandle playerHandle = GameModelCache::Load("octopus.obj");
+	const ModelHandle playerHandle = GameModelCache::Load("cube.obj");
 	playerObject_ = std::make_unique<Engine::Graphics3D::Object3D>();
 	playerObject_->Initialize(Engine::Graphics3D::Object3DCommon::GetInstance());
 	GameModelCache::ApplyToObject(*playerObject_, playerHandle);
@@ -152,15 +152,34 @@ void Player::UpdateMovement(float deltaTime)
 void Player::UpdateAim(float deltaTime)
 {
 	Engine::InputSystem::Input* input = Engine::InputSystem::Input::GetInstance();
+	if (!input || GameInputBindings::IsGameInputSuppressedByImGui()) {
+		return;
+	}
+
 	const Engine::InputSystem::Input::MouseMove mouseMove = input ? input->GetMouseMove() : Engine::InputSystem::Input::MouseMove{};
-	const bool mouseMoved = mouseMove.lX != 0 || mouseMove.lY != 0;
+	const bool mouseActive = mouseMove.lX != 0 || mouseMove.lY != 0 || input->PushMouse(0) || input->PushMouse(1);
+	const bool keyboardActive = GameInputBindings::HasKeyboardNavigationInput(input);
+	const bool keyboardMouseActive = keyboardActive || mouseActive;
+	const bool gamepadActive = GameInputBindings::HasGamepadNavigationInput(input);
 
 	Vector2 padAim{};
-	if (!mouseMoved && GameInputBindings::GetAimVector(input, padAim)) {
+	if (GameInputBindings::GetAimVector(input, padAim)) {
+		aimInputDevice_ = AimInputDevice::Gamepad;
 		const float targetAngle = std::atan2(padAim.x, padAim.y);
 		const float diff = NormalizeAngle(targetAngle - rotationY_);
 		const float rotateLerp = std::clamp(deltaTime * 30.0f, 0.0f, 1.0f);
 		rotationY_ = NormalizeAngle(rotationY_ + diff * rotateLerp);
+		return;
+	}
+
+	if (gamepadActive) {
+		aimInputDevice_ = AimInputDevice::Gamepad;
+	}
+	if (keyboardMouseActive) {
+		aimInputDevice_ = AimInputDevice::KeyboardMouse;
+	}
+
+	if (aimInputDevice_ != AimInputDevice::KeyboardMouse) {
 		return;
 	}
 

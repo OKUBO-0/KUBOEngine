@@ -8,6 +8,17 @@ class Object3D;
 
 namespace DirectXGame {
 
+namespace GameLightDefaults {
+	inline const Vector3 kPlayerLightOffset{ 0.0f, 40.0f, 22.5f };
+	inline const Vector4 kDirectionalColor{ 1.05f, 1.0f, 0.95f, 1.0f };
+	inline const Vector3 kDirectionalDirection{ -0.35f, -1.0f, -0.4f };
+	inline constexpr float kDirectionalIntensity = 0.18f;
+	inline const Vector4 kPointColor{ 1.0f, 0.96f, 0.82f, 1.0f };
+	inline constexpr float kPointIntensity = 1.015f;
+	inline constexpr float kPointRadius = 220.0f;
+	inline constexpr float kPointDecay = 2.05f;
+}
+
 class GameLightSettings {
 public:
 	GameLightSettings();

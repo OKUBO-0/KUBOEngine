@@ -18,10 +18,10 @@ void Drone::Initialize(const Vector3& offset)
 	offset_ = offset;
 
 	Engine::Base::TextureManager::GetInstance()->LoadTexture(kEnvironmentTexturePath);
-	const ModelHandle octopusHandle = GameModelCache::Load("octopus.obj");
+	const ModelHandle droneHandle = GameModelCache::Load("cube.obj");
 	object_ = std::make_unique<Engine::Graphics3D::Object3D>();
 	object_->Initialize(Engine::Graphics3D::Object3DCommon::GetInstance());
-	GameModelCache::ApplyToObject(*object_, octopusHandle);
+	GameModelCache::ApplyToObject(*object_, droneHandle);
 	object_->SetSkyboxFilePath(kEnvironmentTexturePath);
 	object_->SetEnvironmentReflectionStrength(0.0f);
 	object_->SetEnvironmentRoughness(1.0f);

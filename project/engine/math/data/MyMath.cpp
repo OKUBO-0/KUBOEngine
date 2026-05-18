@@ -341,8 +341,8 @@ Matrix4x4 MyMath::MakePerspectiveFovMatrix(float fovY, float aspectRatio, float 
 	return MakeMatrixFromRows(
 		{ cotHalfFov / aspectRatio, 0.0f, 0.0f, 0.0f },
 		{ 0.0f, cotHalfFov, 0.0f, 0.0f },
-		{ 0.0f, 0.0f, nearClip / depthRange, 1.0f },
-		{ 0.0f, 0.0f, -(nearClip + nearClip) / depthRange, 0.0f });
+		{ 0.0f, 0.0f, farClip / depthRange, 1.0f },
+		{ 0.0f, 0.0f, -(nearClip * farClip) / depthRange, 0.0f });
 }
 Matrix4x4 MyMath::MakeOrthographicMatrix(float left, float top, float right, float bottom, float nearClip, float farClip)
 {

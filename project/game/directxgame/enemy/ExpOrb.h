@@ -21,6 +21,7 @@ public:
 
 private:
 	void ApplyTransform();
+	void Collect();
 
 	Vector3 position_{ 0.0f, 0.0f, 0.0f };
 	Vector3 velocity_{ 0.0f, 0.0f, 0.0f };

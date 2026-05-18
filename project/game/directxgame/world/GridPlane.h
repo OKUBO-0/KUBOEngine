@@ -18,11 +18,13 @@ public:
 private:
 	static float SnapToTile(float value);
 
-	std::array<std::unique_ptr<Engine::Graphics3D::Object3D>, 9> tiles_;
+	static constexpr int kTileRadius = 6;
+	static constexpr int kTileCountPerAxis = kTileRadius * 2 + 1;
+	std::array<std::unique_ptr<Engine::Graphics3D::Object3D>, kTileCountPerAxis * kTileCountPerAxis> tiles_;
 	GameLightSettings lightSettings_{};
 	float animationTime_ = 0.0f;
 
-	static constexpr float kGroundScale = 160.0f;
+	static constexpr float kGroundScale = 10.0f;
 	static constexpr float kTileSpan = kGroundScale * 2.0f;
 };
 

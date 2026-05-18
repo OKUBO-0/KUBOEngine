@@ -39,8 +39,8 @@ void GridPlane::Update(const Vector3& focusPosition)
 	const float centerZ = SnapToTile(focusPosition.z);
 
 	size_t index = 0;
-	for (int z = -1; z <= 1; ++z) {
-		for (int x = -1; x <= 1; ++x) {
+	for (int z = -kTileRadius; z <= kTileRadius; ++z) {
+		for (int x = -kTileRadius; x <= kTileRadius; ++x) {
 			if (!tiles_[index]) {
 				++index;
 				continue;

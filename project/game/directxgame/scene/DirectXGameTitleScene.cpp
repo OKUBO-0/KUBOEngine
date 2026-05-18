@@ -113,9 +113,14 @@ void DirectXGameTitleScene::Update()
 		UpdateNavigation();
 	}
 	UpdateModelAnimation();
+	UpdatePlayerLight();
+	UpdateCameraAnimation();
 
 	if (titleObject_) {
 		titleObject_->Update();
+	}
+	if (gridPlane_) {
+		gridPlane_->Update(layoutSettings_.modelBasePosition);
 	}
 	if (skyDomeObject_) {
 		skyDomeObject_->Update();
@@ -132,6 +137,9 @@ void DirectXGameTitleScene::Draw()
 	Engine::Graphics3D::Object3DCommon::GetInstance()->CommonDraw();
 	if (skyDomeObject_) {
 		skyDomeObject_->Draw();
+	}
+	if (gridPlane_) {
+		gridPlane_->Draw();
 	}
 	if (titleObject_) {
 		titleObject_->Draw();
@@ -164,6 +172,12 @@ void DirectXGameTitleScene::InitializeResources()
 	layoutSettings_.guideSize = UILayoutIO::GetVector2(titleLayout, "guideSize", layoutSettings_.guideSize);
 	layoutSettings_.modelBasePosition = UILayoutIO::GetVector3(titleLayout, "modelBasePosition", layoutSettings_.modelBasePosition);
 	layoutSettings_.modelScale = UILayoutIO::GetVector3(titleLayout, "modelScale", layoutSettings_.modelScale);
+	layoutSettings_.cameraTarget = UILayoutIO::GetVector3(titleLayout, "cameraTarget", layoutSettings_.cameraTarget);
+	layoutSettings_.cameraDistance = UILayoutIO::GetFloat(titleLayout, "cameraDistance", layoutSettings_.cameraDistance);
+	layoutSettings_.cameraHeight = UILayoutIO::GetFloat(titleLayout, "cameraHeight", layoutSettings_.cameraHeight);
+	layoutSettings_.cameraPitch = UILayoutIO::GetFloat(titleLayout, "cameraPitch", layoutSettings_.cameraPitch);
+	layoutSettings_.cameraYaw = UILayoutIO::GetFloat(titleLayout, "cameraYaw", layoutSettings_.cameraYaw);
+	layoutSettings_.cameraOrbitSpeed = UILayoutIO::GetFloat(titleLayout, "cameraOrbitSpeed", layoutSettings_.cameraOrbitSpeed);
 
 	titleSprite_.Initialize(kTitleTexturePath, layoutSettings_.titlePosition);
 	cursorSprite_.Initialize(kCursorTexturePath, layoutSettings_.cursorBasePosition);
@@ -182,17 +196,16 @@ void DirectXGameTitleScene::InitializeResources()
 void DirectXGameTitleScene::InitializeCameraAndObjects()
 {
 	titleCamera_ = std::make_unique<Engine::CameraSystem::Camera>();
-	titleCamera_->SetTranslate({ 0.0f, 0.0f, -50.0f });
-	titleCamera_->Update();
+	UpdateCameraAnimation();
 	Engine::CameraSystem::CameraManager::GetInstance()->AddCamera(kTitleCameraName, titleCamera_.get());
 	Engine::CameraSystem::CameraManager::GetInstance()->SetActiveCamera(kTitleCameraName);
 
 	Engine::Base::TextureManager::GetInstance()->LoadTexture(kEnvironmentTexturePath);
 
-	const ModelHandle octopusHandle = GameModelCache::Load("octopus.obj");
+	const ModelHandle titleModelHandle = GameModelCache::Load("cube.obj");
 	titleObject_ = std::make_unique<Engine::Graphics3D::Object3D>();
 	titleObject_->Initialize(Engine::Graphics3D::Object3DCommon::GetInstance());
-	GameModelCache::ApplyToObject(*titleObject_, octopusHandle);
+	GameModelCache::ApplyToObject(*titleObject_, titleModelHandle);
 	titleObject_->SetSkyboxFilePath(kEnvironmentTexturePath);
 	titleObject_->SetEnvironmentReflectionStrength(0.0f);
 	titleObject_->SetEnvironmentRoughness(1.0f);
@@ -211,16 +224,44 @@ void DirectXGameTitleScene::InitializeCameraAndObjects()
 	skyDomeObject_->SetLighting(false);
 	skyDomeObject_->SetScale({ 28.0f, 28.0f, 28.0f });
 	skyDomeObject_->SetTranslate({ 0.0f, 0.0f, 0.0f });
+
+	gridPlane_ = std::make_unique<GridPlane>();
+	gridPlane_->Initialize();
+	gridPlane_->SetLightSettings(lightSettings_);
+	gridPlane_->Update(layoutSettings_.modelBasePosition);
+
+	UpdatePlayerLight();
 }
 
 void DirectXGameTitleScene::InitializeLighting()
 {
+	const UILayoutIO::LayoutMap tuning = UILayoutIO::LoadOrDefault(DataPaths::kDebugTuning, {});
+
 	DirectionalLight directional{};
-	directional.color = { 1.05f, 1.0f, 0.95f, 1.0f };
-	directional.direction = { -0.35f, -1.0f, -0.4f };
-	directional.intensity = 1.0f;
-	directional.enable = true;
+	directional.color = GameLightDefaults::kDirectionalColor;
+	directional.direction = GameLightDefaults::kDirectionalDirection;
+	directional.intensity = 0.0f;
+	directional.enable = false;
 	lightSettings_.SetDirectionalLight(directional);
+
+	titleLightOffset_ = UILayoutIO::GetVector3(tuning, "light.pointPlayerOffset", titleLightOffset_);
+
+	PointLight point{};
+	const Vector3 pointColor = UILayoutIO::GetVector3(
+		tuning,
+		"light.pointColor",
+		{ GameLightDefaults::kPointColor.x, GameLightDefaults::kPointColor.y, GameLightDefaults::kPointColor.z });
+	point.color = { pointColor.x, pointColor.y, pointColor.z, GameLightDefaults::kPointColor.w };
+	point.position = {
+		layoutSettings_.modelBasePosition.x + titleLightOffset_.x,
+		layoutSettings_.modelBasePosition.y + titleLightOffset_.y,
+		layoutSettings_.modelBasePosition.z + titleLightOffset_.z,
+	};
+	point.intensity = UILayoutIO::GetFloat(tuning, "light.pointIntensity", GameLightDefaults::kPointIntensity);
+	point.radius = UILayoutIO::GetFloat(tuning, "light.pointRadius", GameLightDefaults::kPointRadius);
+	point.decay = UILayoutIO::GetFloat(tuning, "light.pointDecay", GameLightDefaults::kPointDecay);
+	point.enable = UILayoutIO::GetFloat(tuning, "light.pointEnabled", 1.0f) > 0.5f;
+	lightSettings_.SetPointLight(point);
 	lightSettings_.SetLightingEnabled(true);
 }
 
@@ -240,6 +281,7 @@ void DirectXGameTitleScene::ApplyLayout()
 		titleObject_->SetScale(layoutSettings_.modelScale);
 		titleObject_->SetTranslate(layoutSettings_.modelBasePosition);
 	}
+	UpdateCameraAnimation();
 }
 
 void DirectXGameTitleScene::UpdateCurtain()
@@ -251,6 +293,16 @@ void DirectXGameTitleScene::UpdateCurtain()
 
 void DirectXGameTitleScene::UpdateGuide()
 {
+	if (guideActive_ && guideTransitionState_ == GuideTransitionState::None) {
+		Engine::InputSystem::Input* input = Engine::InputSystem::Input::GetInstance();
+		const GameMenuInputState menuInput = GameMenuController::Update(input, navigationInputDevice_);
+		navigationInputDevice_ = menuInput.device;
+		if (menuInput.cancel || menuInput.confirm) {
+			CloseGuide();
+		}
+		return;
+	}
+
 	if (guideTransitionState_ == GuideTransitionState::None) {
 		return;
 	}
@@ -273,15 +325,6 @@ void DirectXGameTitleScene::UpdateGuide()
 	}
 
 	guideSprite_.SetColor({ 1.0f, 1.0f, 1.0f, guideAlpha_ });
-
-	if (guideActive_) {
-		Engine::InputSystem::Input* input = Engine::InputSystem::Input::GetInstance();
-		const GameMenuInputState menuInput = GameMenuController::Update(input, navigationInputDevice_);
-		navigationInputDevice_ = menuInput.device;
-		if (menuInput.cancel || menuInput.confirm) {
-			CloseGuide();
-		}
-	}
 }
 
 void DirectXGameTitleScene::UpdateNavigation()
@@ -381,17 +424,67 @@ void DirectXGameTitleScene::UpdateModelAnimation()
 		return;
 	}
 
-	Vector3 rotation = titleObject_->GetTransform().rotate;
-	rotation.y += kFixedDeltaTime * 0.625f;
-	titleObject_->SetRotate(rotation);
+	titleObject_->SetRotate({ 0.0f, -2.618f, 0.0f });
+	titleObject_->SetTranslate(layoutSettings_.modelBasePosition);
+}
 
-	const float floatY = std::sin(animationTime_ * 1.875f) * 1.5f;
-	const float floatX = std::sin(animationTime_ * 1.25f) * 1.0f;
-	titleObject_->SetTranslate({
-		layoutSettings_.modelBasePosition.x + floatX,
-		layoutSettings_.modelBasePosition.y + floatY,
-		layoutSettings_.modelBasePosition.z
+void DirectXGameTitleScene::UpdatePlayerLight()
+{
+	PointLight point = lightSettings_.GetPointLight();
+	Vector3 position = layoutSettings_.modelBasePosition;
+	if (titleObject_) {
+		position = titleObject_->GetTransform().translate;
+	}
+	point.position = {
+		position.x + titleLightOffset_.x,
+		position.y + titleLightOffset_.y,
+		position.z + titleLightOffset_.z,
+	};
+	lightSettings_.SetPointLight(point);
+
+	if (titleObject_) {
+		lightSettings_.ApplyTo(*titleObject_);
+	}
+	if (gridPlane_) {
+		gridPlane_->SetLightSettings(lightSettings_);
+	}
+}
+
+void DirectXGameTitleScene::UpdateCameraAnimation()
+{
+	if (!titleCamera_) {
+		return;
+	}
+
+	Vector3 target = layoutSettings_.modelBasePosition;
+	if (titleObject_) {
+		target = titleObject_->GetTransform().translate;
+	}
+	target.x += layoutSettings_.cameraTarget.x;
+	target.y += layoutSettings_.cameraTarget.y;
+	target.z += layoutSettings_.cameraTarget.z;
+
+	const float yaw = layoutSettings_.cameraYaw + animationTime_ * layoutSettings_.cameraOrbitSpeed;
+	const Vector3 forward{
+		std::sin(yaw),
+		0.0f,
+		std::cos(yaw),
+	};
+
+	titleCamera_->SetTranslate({
+		target.x - forward.x * layoutSettings_.cameraDistance,
+		target.y + layoutSettings_.cameraHeight,
+		target.z - forward.z * layoutSettings_.cameraDistance,
 		});
+	titleCamera_->SetRotate({ layoutSettings_.cameraPitch, yaw, 0.0f });
+	titleCamera_->SetFarClip(500.0f);
+	titleCamera_->Update();
+
+	Engine::CameraSystem::CameraManager* cameraManager = Engine::CameraSystem::CameraManager::GetInstance();
+	if (cameraManager->GetCamera(kTitleCameraName)) {
+		cameraManager->SyncCamera(kTitleCameraName, titleCamera_.get());
+		cameraManager->SetActiveCamera(kTitleCameraName);
+	}
 }
 
 void DirectXGameTitleScene::DrawDebugUi()
@@ -519,6 +612,30 @@ void DirectXGameTitleScene::DrawDebugUi()
 			ApplyLayout();
 		}
 
+		float cameraTarget[3]{
+			layoutSettings_.cameraTarget.x,
+			layoutSettings_.cameraTarget.y,
+			layoutSettings_.cameraTarget.z,
+		};
+		if (ImGui::DragFloat3("Camera Target Offset", cameraTarget, 0.1f, -60.0f, 60.0f)) {
+			layoutSettings_.cameraTarget = { cameraTarget[0], cameraTarget[1], cameraTarget[2] };
+			ApplyLayout();
+		}
+
+		if (ImGui::DragFloat("Camera Distance", &layoutSettings_.cameraDistance, 0.5f, 8.0f, 120.0f)) {
+			ApplyLayout();
+		}
+		if (ImGui::DragFloat("Camera Height", &layoutSettings_.cameraHeight, 0.5f, -20.0f, 80.0f)) {
+			ApplyLayout();
+		}
+		if (ImGui::DragFloat("Camera Pitch", &layoutSettings_.cameraPitch, 0.01f, -1.2f, 1.2f)) {
+			ApplyLayout();
+		}
+		if (ImGui::DragFloat("Camera Yaw", &layoutSettings_.cameraYaw, 0.01f, -6.28f, 6.28f)) {
+			ApplyLayout();
+		}
+		ImGui::DragFloat("Camera Orbit Speed", &layoutSettings_.cameraOrbitSpeed, 0.01f, -1.0f, 1.0f);
+
 		if (ImGui::Button("Save Title Layout")) {
 			UILayoutIO::Save(DataPaths::kTitleLayout,
 				{
@@ -534,6 +651,12 @@ void DirectXGameTitleScene::DrawDebugUi()
 					{ "guideSize", { layoutSettings_.guideSize.x, layoutSettings_.guideSize.y } },
 					{ "modelBasePosition", { layoutSettings_.modelBasePosition.x, layoutSettings_.modelBasePosition.y, layoutSettings_.modelBasePosition.z } },
 					{ "modelScale", { layoutSettings_.modelScale.x, layoutSettings_.modelScale.y, layoutSettings_.modelScale.z } },
+					{ "cameraTarget", { layoutSettings_.cameraTarget.x, layoutSettings_.cameraTarget.y, layoutSettings_.cameraTarget.z } },
+					{ "cameraDistance", { layoutSettings_.cameraDistance } },
+					{ "cameraHeight", { layoutSettings_.cameraHeight } },
+					{ "cameraPitch", { layoutSettings_.cameraPitch } },
+					{ "cameraYaw", { layoutSettings_.cameraYaw } },
+					{ "cameraOrbitSpeed", { layoutSettings_.cameraOrbitSpeed } },
 				});
 		}
 	}

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "BaseScene.h"
+#include "Camera.h"
+#include "Object3D.h"
 #include "game/directxgame/core/GameAudioCache.h"
 #include "game/directxgame/core/GameInputBindings.h"
 #include "game/directxgame/core/GameLightSettings.h"
@@ -38,6 +40,7 @@ public:
 
 private:
 	void InitializeLighting();
+	void InitializeDebugCamera();
 	void InitializeWorld();
 	void InitializeUi();
 	void InitializePauseBuildUi();
@@ -64,10 +67,17 @@ private:
 	void BuildLevelUpChoices();
 	void ApplySelectedLevelUpChoice();
 	void ApplyLevelUpLayout();
+	int32_t GetHoveredPauseMenuIndex() const;
+	bool IsMousePauseConfirm(int32_t hoveredMenuIndex) const;
+	int32_t GetHoveredLevelUpChoiceIndex() const;
+	bool IsMouseLevelUpConfirm(int32_t hoveredChoiceIndex) const;
 	void SpawnLevelUpConfetti();
 	void MoveMenuSelection(int32_t delta);
 	void QueueDebugDraw();
 	void QueueEffectDraw();
+	void UpdatePlayerLight();
+	void ApplyLightSettingsToWorld();
+	void UpdateDebugCamera();
 	void UpdateDebugUi();
 	void ApplyPostEffect() const;
 	const char* GetGameStateName() const;
@@ -112,6 +122,14 @@ private:
 		bool debugEnabled = false;
 	};
 
+	struct PauseMenuLayout {
+		std::array<Vector2, 2> hitboxPositions{
+			Vector2{ 840.0f, 294.0f },
+			Vector2{ 840.0f, 462.0f },
+		};
+		Vector2 hitboxSize{ 280.0f, 92.0f };
+	};
+
 	struct ParticleTuning {
 		int32_t playerDamageSparkCount = 18;
 		int32_t playerDamageRippleCount = 1;
@@ -146,6 +164,13 @@ private:
 	std::unique_ptr<SkyDome> skyDome_;
 	std::unique_ptr<CurtainTransition> curtain_;
 	GameLightSettings lightSettings_{};
+	Engine::CameraSystem::Camera debugCamera_{};
+	Vector3 debugCameraPosition_{ 0.0f, 85.0f, -85.0f };
+	Vector3 debugCameraRotation_{ 0.82f, 0.0f, 0.0f };
+	Vector3 playerLightOffset_ = GameLightDefaults::kPlayerLightOffset;
+	bool debugCameraEnabled_ = false;
+	bool lightDebugDrawEnabled_ = true;
+	bool playerLightFollowsPlayer_ = true;
 
 	GameState gameState_ = GameState::Start;
 #ifdef _DEBUG
@@ -167,6 +192,7 @@ private:
 	std::array<UILabel, 5> pauseBuildIcons_;
 	std::vector<LevelUpChoice> levelUpChoices_;
 	PauseBuildLayout pauseBuildLayout_{};
+	PauseMenuLayout pauseMenuLayout_{};
 	ParticleTuning particleTuning_{};
 	SoundHandle startSeHandle_ = 0;
 	SoundHandle pauseSeHandle_ = 0;
@@ -185,6 +211,10 @@ private:
 	uint32_t debugSoftCapNextAutoLogFrame_ = 0;
 	uint32_t debugSoftCapLastAutoLogFrame_ = UINT32_MAX;
 	float levelUpSlideOffsetX_ = 1280.0f;
+	Vector2 levelUpChoiceSize_{ 1280.0f, 720.0f };
+	float levelUpChoiceStepY_ = 140.0f;
+	Vector2 levelUpChoiceHitboxOffset_{ 465.0f, 214.0f };
+	Vector2 levelUpChoiceHitboxSize_{ 435.0f, 68.0f };
 	float uiAnimationTime_ = 0.0f;
 	std::string pendingSceneId_;
 	LevelUpAnimationState levelUpAnimationState_ = LevelUpAnimationState::Hidden;

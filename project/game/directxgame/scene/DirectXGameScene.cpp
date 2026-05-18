@@ -10,6 +10,7 @@
 #include "Line.h"
 #include "LineCommon.h"
 #include "Model.h"
+#include "MyMath.h"
 #include "Object3DCommon.h"
 #include "OffscreenRenderManager.h"
 #include "ParticleManager.h"
@@ -37,7 +38,10 @@ constexpr char kAudioLevelUp[] = "game.levelUp";
 constexpr char kAudioDeath[] = "game.death";
 constexpr float kLevelUpSlideSpeed = 4200.0f;
 constexpr Vector2 kLevelUpChoiceSize{ 1280.0f, 720.0f };
-
+constexpr float kLevelUpChoiceStepY = 140.0f;
+constexpr Vector2 kLevelUpChoiceHitboxOffset{ 465.0f, 214.0f };
+constexpr Vector2 kLevelUpChoiceHitboxSize{ 435.0f, 68.0f };
+constexpr float kPauseCursorStepY = 168.0f;
 constexpr std::array<std::pair<const char*, float>, 13> kAudioTuningDefaults{ {
 	{ "title.bgm", 0.1f },
 	{ "title.select", 1.0f },
@@ -100,6 +104,14 @@ std::string WeaponLevelTexturePath(const char* weaponDirectory, int32_t nextLeve
 	return std::string("ui/game/") + weaponDirectory + "/lv" + std::to_string(nextLevel) + ".png";
 }
 
+bool IsPointInRect(const Vector2& point, const Vector2& rectPosition, const Vector2& rectSize)
+{
+	return point.x >= rectPosition.x &&
+		point.x <= rectPosition.x + rectSize.x &&
+		point.y >= rectPosition.y &&
+		point.y <= rectPosition.y + rectSize.y;
+}
+
 }
 
 namespace DirectXGame {
@@ -119,6 +131,7 @@ void DirectXGameScene::Initialize()
 
 	InitializeLighting();
 	InitializeWorld();
+	InitializeDebugCamera();
 	LoadDebugTuning();
 	InitializeUi();
 	InitializeParticles();
@@ -135,6 +148,7 @@ void DirectXGameScene::Finalize()
 	if (levelUpSeHandle_ != 0) { GameAudioCache::Stop(levelUpSeHandle_); }
 	if (gameOverSeHandle_ != 0) { GameAudioCache::Stop(gameOverSeHandle_); }
 	Engine::CameraSystem::CameraManager::GetInstance()->RemoveCamera("directxgame_player");
+	Engine::CameraSystem::CameraManager::GetInstance()->RemoveCamera("directxgame_debug");
 }
 
 void DirectXGameScene::Update()
@@ -169,6 +183,7 @@ void DirectXGameScene::Update()
 		}
 		UpdateGamePlay(kFixedDeltaTime);
 	}
+	UpdatePlayerLight();
 	UpdateEffects();
 
 	if (gridPlane_ && player_) {
@@ -177,6 +192,7 @@ void DirectXGameScene::Update()
 	if (skyDome_) {
 		skyDome_->Update();
 	}
+	UpdateDebugCamera();
 
 	if (sessionContext_ && gameState_ == GameState::Playing && !gameplayFrozen) {
 		sessionContext_->AdvanceGameFrame();
@@ -233,12 +249,30 @@ void DirectXGameScene::Draw()
 void DirectXGameScene::InitializeLighting()
 {
 	DirectionalLight directional{};
-	directional.color = { 1.05f, 1.0f, 0.95f, 1.0f };
-	directional.direction = { -0.35f, -1.0f, -0.4f };
-	directional.intensity = 1.0f;
+	directional.color = GameLightDefaults::kDirectionalColor;
+	directional.direction = GameLightDefaults::kDirectionalDirection;
+	directional.intensity = GameLightDefaults::kDirectionalIntensity;
 	directional.enable = true;
 	lightSettings_.SetDirectionalLight(directional);
+
+	PointLight point{};
+	point.color = GameLightDefaults::kPointColor;
+	point.position = playerLightOffset_;
+	point.intensity = GameLightDefaults::kPointIntensity;
+	point.radius = GameLightDefaults::kPointRadius;
+	point.decay = GameLightDefaults::kPointDecay;
+	point.enable = true;
+	lightSettings_.SetPointLight(point);
 	lightSettings_.SetLightingEnabled(true);
+}
+
+void DirectXGameScene::InitializeDebugCamera()
+{
+	debugCamera_.SetTranslate(debugCameraPosition_);
+	debugCamera_.SetRotate(debugCameraRotation_);
+	debugCamera_.SetFarClip(500.0f);
+	debugCamera_.Update();
+	Engine::CameraSystem::CameraManager::GetInstance()->AddCamera("directxgame_debug", &debugCamera_);
 }
 
 void DirectXGameScene::InitializeWorld()
@@ -280,10 +314,14 @@ void DirectXGameScene::InitializeUi()
 	startOverlay_.SetSize({ 1280.0f, 720.0f });
 	pauseOverlay_.Initialize("ui/game/pause.png", { 0.0f, 0.0f });
 	pauseOverlay_.SetSize({ 1280.0f, 720.0f });
-	pauseCursor_.Initialize("ui/game/pause_arrow.png", { 790.0f, 318.0f });
-	pauseCursor_.SetSize({ 64.0f, 64.0f });
+	pauseCursor_.Initialize("ui/game/pause_arrow.png", { 0.0f, 0.0f });
 	levelUpOverlay_.Initialize("ui/game/levelup.png", { 0.0f, 0.0f });
 	levelUpOverlay_.SetSize({ 1280.0f, 720.0f });
+	const UILayoutIO::LayoutMap levelUpLayout = UILayoutIO::LoadOrDefault(DataPaths::kLevelupLayout, {});
+	levelUpChoiceSize_ = UILayoutIO::GetVector2(levelUpLayout, "choiceSize", kLevelUpChoiceSize);
+	levelUpChoiceStepY_ = UILayoutIO::GetFloat(levelUpLayout, "choiceSpacingY", kLevelUpChoiceStepY);
+	levelUpChoiceHitboxOffset_ = UILayoutIO::GetVector2(levelUpLayout, "choiceHitboxOffset", kLevelUpChoiceHitboxOffset);
+	levelUpChoiceHitboxSize_ = UILayoutIO::GetVector2(levelUpLayout, "choiceHitboxSize", kLevelUpChoiceHitboxSize);
 	hitFlashOverlay_.Initialize("white1x1.png", { 0.0f, 0.0f });
 	hitFlashOverlay_.SetSize({ 1280.0f, 720.0f });
 	hitFlashOverlay_.SetColor({ 1.0f, 0.12f, 0.08f, 1.0f });
@@ -296,11 +334,11 @@ void DirectXGameScene::InitializeUi()
 
 	for (UILabel& choiceSprite : levelUpChoiceSprites_) {
 		choiceSprite.Initialize("ui/game/lvup_attack.png", { 0.0f, 0.0f });
-		choiceSprite.SetSize(kLevelUpChoiceSize);
+		choiceSprite.SetSize(levelUpChoiceSize_);
 	}
 	for (UILabel& choiceIcon : levelUpChoiceIcons_) {
 		choiceIcon.Initialize("ui/game/lvup_attack_icon.png", { 0.0f, 0.0f });
-		choiceIcon.SetSize(kLevelUpChoiceSize);
+		choiceIcon.SetSize(levelUpChoiceSize_);
 		choiceIcon.SetVisible(false);
 	}
 	InitializePauseBuildUi();
@@ -326,6 +364,9 @@ void DirectXGameScene::InitializePauseBuildUi()
 	pauseBuildLayout_.stepX = UILayoutIO::GetFloat(layout, "pauseBuildStepX", pauseBuildLayout_.stepX);
 	pauseBuildLayout_.iconSize = UILayoutIO::GetVector2(layout, "pauseBuildIconSize", pauseBuildLayout_.iconSize);
 	pauseBuildLayout_.visible = UILayoutIO::GetFloat(layout, "pauseBuildVisible", pauseBuildLayout_.visible ? 1.0f : 0.0f) > 0.5f;
+	pauseMenuLayout_.hitboxPositions[0] = UILayoutIO::GetVector2(layout, "menuHitbox0", pauseMenuLayout_.hitboxPositions[0]);
+	pauseMenuLayout_.hitboxPositions[1] = UILayoutIO::GetVector2(layout, "menuHitbox1", pauseMenuLayout_.hitboxPositions[1]);
+	pauseMenuLayout_.hitboxSize = UILayoutIO::GetVector2(layout, "menuHitboxSize", pauseMenuLayout_.hitboxSize);
 
 	const std::array<const char*, 5> iconPaths{
 		"ui/game/normal/icon.png",
@@ -450,6 +491,32 @@ void DirectXGameScene::LoadDebugTuning()
 			player_->SetCameraMode(static_cast<Player::CameraMode>(cameraMode));
 		}
 	}
+	debugCameraPosition_ = UILayoutIO::GetVector3(tuning, "debugCamera.position", debugCameraPosition_);
+	debugCameraRotation_ = UILayoutIO::GetVector3(tuning, "debugCamera.rotation", debugCameraRotation_);
+	debugCameraEnabled_ = UILayoutIO::GetFloat(tuning, "debugCamera.enabled", debugCameraEnabled_ ? 1.0f : 0.0f) > 0.5f;
+	lightDebugDrawEnabled_ = UILayoutIO::GetFloat(tuning, "light.debugDrawEnabled", lightDebugDrawEnabled_ ? 1.0f : 0.0f) > 0.5f;
+	playerLightFollowsPlayer_ = UILayoutIO::GetFloat(tuning, "light.pointFollowsPlayer", playerLightFollowsPlayer_ ? 1.0f : 0.0f) > 0.5f;
+	playerLightOffset_ = UILayoutIO::GetVector3(tuning, "light.pointPlayerOffset", playerLightOffset_);
+
+	DirectionalLight directional = lightSettings_.GetDirectionalLight();
+	const Vector3 directionalColor = UILayoutIO::GetVector3(tuning, "light.directionalColor", { directional.color.x, directional.color.y, directional.color.z });
+	directional.color = { directionalColor.x, directionalColor.y, directionalColor.z, directional.color.w };
+	directional.direction = UILayoutIO::GetVector3(tuning, "light.directionalDirection", directional.direction);
+	directional.intensity = UILayoutIO::GetFloat(tuning, "light.directionalIntensity", directional.intensity);
+	directional.enable = UILayoutIO::GetFloat(tuning, "light.directionalEnabled", directional.enable ? 1.0f : 0.0f) > 0.5f;
+	lightSettings_.SetDirectionalLight(directional);
+
+	PointLight point = lightSettings_.GetPointLight();
+	const Vector3 pointColor = UILayoutIO::GetVector3(tuning, "light.pointColor", { point.color.x, point.color.y, point.color.z });
+	point.color = { pointColor.x, pointColor.y, pointColor.z, point.color.w };
+	point.position = UILayoutIO::GetVector3(tuning, "light.pointPosition", point.position);
+	point.intensity = UILayoutIO::GetFloat(tuning, "light.pointIntensity", point.intensity);
+	point.radius = UILayoutIO::GetFloat(tuning, "light.pointRadius", point.radius);
+	point.decay = UILayoutIO::GetFloat(tuning, "light.pointDecay", point.decay);
+	point.enable = UILayoutIO::GetFloat(tuning, "light.pointEnabled", point.enable ? 1.0f : 0.0f) > 0.5f;
+	lightSettings_.SetPointLight(point);
+	UpdatePlayerLight();
+	ApplyLightSettingsToWorld();
 }
 
 void DirectXGameScene::SaveDebugTuning() const
@@ -492,6 +559,26 @@ void DirectXGameScene::SaveDebugTuning() const
 		entries.push_back({ "camera.mode", { static_cast<float>(player_->GetCameraMode()) } });
 		entries.push_back({ "camera.mouseAimEnabled", { player_->IsMouseAimEnabled() ? 1.0f : 0.0f } });
 	}
+	entries.push_back({ "debugCamera.enabled", { debugCameraEnabled_ ? 1.0f : 0.0f } });
+	entries.push_back({ "debugCamera.position", { debugCameraPosition_.x, debugCameraPosition_.y, debugCameraPosition_.z } });
+	entries.push_back({ "debugCamera.rotation", { debugCameraRotation_.x, debugCameraRotation_.y, debugCameraRotation_.z } });
+	entries.push_back({ "light.debugDrawEnabled", { lightDebugDrawEnabled_ ? 1.0f : 0.0f } });
+
+	const DirectionalLight& directional = lightSettings_.GetDirectionalLight();
+	entries.push_back({ "light.directionalEnabled", { directional.enable ? 1.0f : 0.0f } });
+	entries.push_back({ "light.directionalColor", { directional.color.x, directional.color.y, directional.color.z } });
+	entries.push_back({ "light.directionalDirection", { directional.direction.x, directional.direction.y, directional.direction.z } });
+	entries.push_back({ "light.directionalIntensity", { directional.intensity } });
+
+	const PointLight& point = lightSettings_.GetPointLight();
+	entries.push_back({ "light.pointEnabled", { point.enable ? 1.0f : 0.0f } });
+	entries.push_back({ "light.pointColor", { point.color.x, point.color.y, point.color.z } });
+	entries.push_back({ "light.pointPosition", { point.position.x, point.position.y, point.position.z } });
+	entries.push_back({ "light.pointIntensity", { point.intensity } });
+	entries.push_back({ "light.pointRadius", { point.radius } });
+	entries.push_back({ "light.pointDecay", { point.decay } });
+	entries.push_back({ "light.pointFollowsPlayer", { playerLightFollowsPlayer_ ? 1.0f : 0.0f } });
+	entries.push_back({ "light.pointPlayerOffset", { playerLightOffset_.x, playerLightOffset_.y, playerLightOffset_.z } });
 	UILayoutIO::Save(DataPaths::kDebugTuning, entries);
 #endif
 }
@@ -745,14 +832,23 @@ void DirectXGameScene::UpdateUi(float deltaTime)
 	}
 
 	if (gameState_ == GameState::Paused) {
+		const int32_t hoveredMenuIndex = GetHoveredPauseMenuIndex();
 		if (menuInput.moveDelta != 0) {
 			MoveMenuSelection(1);
 		}
-		pauseCursor_.SetPosition({ 790.0f, menuSelection_ == 0 ? 318.0f : 486.0f });
+		if (navigationInputDevice_ == GameInputBindings::NavigationInputDevice::Mouse &&
+			hoveredMenuIndex >= 0) {
+			menuSelection_ = hoveredMenuIndex;
+		}
+		pauseCursor_.SetPosition({ 0.0f, menuSelection_ == 0 ? 0.0f : kPauseCursorStepY });
 		const float cursorPulse = 0.5f + 0.5f * std::sin(uiAnimationTime_ * 8.0f);
-		pauseCursor_.SetScale(1.0f + cursorPulse * 0.08f);
+		pauseCursor_.SetScale(1.0f);
 		pauseCursor_.SetAlpha(0.72f + cursorPulse * 0.28f);
-		if (menuInput.confirm) {
+		const bool confirmTriggered =
+			navigationInputDevice_ == GameInputBindings::NavigationInputDevice::Mouse
+			? IsMousePauseConfirm(hoveredMenuIndex)
+			: menuInput.confirm;
+		if (confirmTriggered) {
 			if (menuSelection_ == 0) {
 				EnterPlaying();
 			} else {
@@ -770,8 +866,13 @@ void DirectXGameScene::UpdateUi(float deltaTime)
 		if (levelUpAnimationState_ != LevelUpAnimationState::Idle) {
 			return;
 		}
+		const int32_t hoveredChoiceIndex = GetHoveredLevelUpChoiceIndex();
 		if (menuInput.moveDelta != 0) {
 			MoveMenuSelection(menuInput.moveDelta);
+		}
+		if (navigationInputDevice_ == GameInputBindings::NavigationInputDevice::Mouse &&
+			hoveredChoiceIndex >= 0) {
+			menuSelection_ = hoveredChoiceIndex;
 		}
 		const float selectedPulse = 0.5f + 0.5f * std::sin(uiAnimationTime_ * 7.2f);
 		for (size_t index = 0; index < levelUpChoiceSprites_.size(); ++index) {
@@ -784,7 +885,11 @@ void DirectXGameScene::UpdateUi(float deltaTime)
 			levelUpChoiceSprites_[index].SetAlpha(selected ? 1.0f : 0.78f);
 			levelUpChoiceIcons_[index].SetAlpha(selected ? 1.0f : 0.78f);
 		}
-		if (menuInput.confirm) {
+		const bool confirmTriggered =
+			navigationInputDevice_ == GameInputBindings::NavigationInputDevice::Mouse
+			? IsMouseLevelUpConfirm(hoveredChoiceIndex)
+			: menuInput.confirm;
+		if (confirmTriggered) {
 			levelUpSelectionPending_ = true;
 			levelUpAnimationState_ = LevelUpAnimationState::Exiting;
 		}
@@ -908,6 +1013,9 @@ void DirectXGameScene::SavePauseBuildLayout() const
 			{ "pauseBuildStepX", { pauseBuildLayout_.stepX } },
 			{ "pauseBuildIconSize", { pauseBuildLayout_.iconSize.x, pauseBuildLayout_.iconSize.y } },
 			{ "pauseBuildVisible", { pauseBuildLayout_.visible ? 1.0f : 0.0f } },
+			{ "menuHitbox0", { pauseMenuLayout_.hitboxPositions[0].x, pauseMenuLayout_.hitboxPositions[0].y } },
+			{ "menuHitbox1", { pauseMenuLayout_.hitboxPositions[1].x, pauseMenuLayout_.hitboxPositions[1].y } },
+			{ "menuHitboxSize", { pauseMenuLayout_.hitboxSize.x, pauseMenuLayout_.hitboxSize.y } },
 		});
 }
 
@@ -1056,14 +1164,14 @@ void DirectXGameScene::BuildLevelUpChoices()
 
 	for (size_t index = 0; index < levelUpChoiceSprites_.size(); ++index) {
 		const std::string path = index < levelUpChoices_.size() ? levelUpChoices_[index].texturePath : "ui/game/lvup_attack.png";
-		levelUpChoiceSprites_[index].Initialize(path, { 0.0f, 140.0f * static_cast<float>(index) });
-		levelUpChoiceSprites_[index].SetSize(kLevelUpChoiceSize);
+		levelUpChoiceSprites_[index].Initialize(path, { 0.0f, levelUpChoiceStepY_ * static_cast<float>(index) });
+		levelUpChoiceSprites_[index].SetSize(levelUpChoiceSize_);
 		const std::string iconPath = index < levelUpChoices_.size() ? levelUpChoices_[index].iconPath : "ui/game/lvup_attack_icon.png";
 		levelUpChoiceIcons_[index].Initialize(iconPath, {
 			0.0f,
-			140.0f * static_cast<float>(index),
+			levelUpChoiceStepY_ * static_cast<float>(index),
 		});
-		levelUpChoiceIcons_[index].SetSize(kLevelUpChoiceSize);
+		levelUpChoiceIcons_[index].SetSize(levelUpChoiceSize_);
 		levelUpChoiceIcons_[index].SetVisible(index < levelUpChoices_.size());
 	}
 	ApplyLevelUpLayout();
@@ -1087,15 +1195,64 @@ void DirectXGameScene::ApplyLevelUpLayout()
 	for (size_t index = 0; index < levelUpChoiceSprites_.size(); ++index) {
 		levelUpChoiceSprites_[index].SetPosition({
 			levelUpSlideOffsetX_,
-			140.0f * static_cast<float>(index),
+			levelUpChoiceStepY_ * static_cast<float>(index),
 		});
-		levelUpChoiceSprites_[index].SetSize(kLevelUpChoiceSize);
+		levelUpChoiceSprites_[index].SetSize(levelUpChoiceSize_);
 		levelUpChoiceIcons_[index].SetPosition({
 			levelUpSlideOffsetX_,
-			140.0f * static_cast<float>(index),
+			levelUpChoiceStepY_ * static_cast<float>(index),
 		});
-		levelUpChoiceIcons_[index].SetSize(kLevelUpChoiceSize);
+		levelUpChoiceIcons_[index].SetSize(levelUpChoiceSize_);
 	}
+}
+
+int32_t DirectXGameScene::GetHoveredPauseMenuIndex() const
+{
+	Engine::InputSystem::Input* input = Engine::InputSystem::Input::GetInstance();
+	if (!input || GameInputBindings::IsGameInputSuppressedByImGui()) {
+		return -1;
+	}
+
+	const Vector2 mousePosition = input->GetMousePos();
+	for (int32_t index = 0; index < static_cast<int32_t>(pauseMenuLayout_.hitboxPositions.size()); ++index) {
+		if (IsPointInRect(mousePosition, pauseMenuLayout_.hitboxPositions[static_cast<size_t>(index)], pauseMenuLayout_.hitboxSize)) {
+			return index;
+		}
+	}
+	return -1;
+}
+
+bool DirectXGameScene::IsMousePauseConfirm(int32_t hoveredMenuIndex) const
+{
+	return hoveredMenuIndex >= 0 &&
+		GameInputBindings::IsMouseConfirmTriggered(Engine::InputSystem::Input::GetInstance());
+}
+
+int32_t DirectXGameScene::GetHoveredLevelUpChoiceIndex() const
+{
+	Engine::InputSystem::Input* input = Engine::InputSystem::Input::GetInstance();
+	if (!input || levelUpChoices_.empty()) {
+		return -1;
+	}
+
+	const Vector2 mousePosition = input->GetMousePos();
+	const int32_t choiceCount = static_cast<int32_t>(levelUpChoices_.size());
+	for (int32_t index = 0; index < choiceCount; ++index) {
+		const Vector2 rectPosition{
+			levelUpSlideOffsetX_ + levelUpChoiceHitboxOffset_.x,
+			levelUpChoiceHitboxOffset_.y + levelUpChoiceStepY_ * static_cast<float>(index),
+		};
+		if (IsPointInRect(mousePosition, rectPosition, levelUpChoiceHitboxSize_)) {
+			return index;
+		}
+	}
+	return -1;
+}
+
+bool DirectXGameScene::IsMouseLevelUpConfirm(int32_t hoveredChoiceIndex) const
+{
+	return hoveredChoiceIndex >= 0 &&
+		GameInputBindings::IsMouseConfirmTriggered(Engine::InputSystem::Input::GetInstance());
 }
 
 void DirectXGameScene::SpawnLevelUpConfetti()
@@ -1123,21 +1280,52 @@ void DirectXGameScene::MoveMenuSelection(int32_t delta)
 
 void DirectXGameScene::QueueDebugDraw()
 {
-	if (!debugDrawEnabled_ || !player_) {
+	if ((!debugDrawEnabled_ && !lightDebugDrawEnabled_) || !player_) {
 		return;
 	}
 
 	Engine::LineSystem::Line line;
 	const Vector3 playerPosition = player_->GetWorldPosition();
-	line.DrawSphere(playerPosition, 1.35f, { 0.25f, 0.95f, 1.0f, 1.0f });
-	line.DrawSphere(playerPosition, 50.0f, { 0.25f, 0.55f, 1.0f, 0.45f });
+	if (debugDrawEnabled_) {
+		line.DrawSphere(playerPosition, 1.35f, { 0.25f, 0.95f, 1.0f, 1.0f });
+		line.DrawSphere(playerPosition, 50.0f, { 0.25f, 0.55f, 1.0f, 0.45f });
 
-	if (enemyManager_) {
-		for (const std::unique_ptr<Enemy>& enemy : enemyManager_->GetEnemies()) {
-			if (!enemy || !enemy->IsActive()) {
-				continue;
+		if (enemyManager_) {
+			for (const std::unique_ptr<Enemy>& enemy : enemyManager_->GetEnemies()) {
+				if (!enemy || !enemy->IsActive()) {
+					continue;
+				}
+				line.DrawSphere(enemy->GetPosition(), 1.55f, { 1.0f, 0.2f, 0.18f, 1.0f });
 			}
-			line.DrawSphere(enemy->GetPosition(), 1.55f, { 1.0f, 0.2f, 0.18f, 1.0f });
+		}
+	}
+
+	if (lightDebugDrawEnabled_) {
+		const PointLight& pointLight = lightSettings_.GetPointLight();
+		if (pointLight.enable) {
+			line.DrawSphere(pointLight.position, 2.0f, { 1.0f, 0.95f, 0.35f, 1.0f });
+			line.DrawSphere(pointLight.position, pointLight.radius, { 1.0f, 0.85f, 0.25f, 0.24f });
+			line.Draw({ pointLight.position.x - 4.0f, pointLight.position.y, pointLight.position.z },
+				{ pointLight.position.x + 4.0f, pointLight.position.y, pointLight.position.z },
+				{ 1.0f, 0.95f, 0.35f, 1.0f });
+			line.Draw({ pointLight.position.x, pointLight.position.y - 4.0f, pointLight.position.z },
+				{ pointLight.position.x, pointLight.position.y + 4.0f, pointLight.position.z },
+				{ 1.0f, 0.95f, 0.35f, 1.0f });
+			line.Draw({ pointLight.position.x, pointLight.position.y, pointLight.position.z - 4.0f },
+				{ pointLight.position.x, pointLight.position.y, pointLight.position.z + 4.0f },
+				{ 1.0f, 0.95f, 0.35f, 1.0f });
+		}
+
+		const DirectionalLight& directionalLight = lightSettings_.GetDirectionalLight();
+		if (directionalLight.enable) {
+			const Vector3 start = playerPosition + Vector3{ 0.0f, 22.0f, 0.0f };
+			const Vector3 end = {
+				start.x + directionalLight.direction.x * 16.0f,
+				start.y + directionalLight.direction.y * 16.0f,
+				start.z + directionalLight.direction.z * 16.0f,
+			};
+			line.Draw(start, end, { 1.0f, 1.0f, 0.55f, 1.0f });
+			line.DrawSphere(start, 0.9f, { 1.0f, 1.0f, 0.55f, 1.0f });
 		}
 	}
 }
@@ -1181,6 +1369,64 @@ void DirectXGameScene::QueueEffectDraw()
 					{ 0.35f, 1.0f, 0.65f, 0.45f });
 			}
 		}
+	}
+}
+
+void DirectXGameScene::ApplyLightSettingsToWorld()
+{
+	if (player_) {
+		player_->SetLightSettings(lightSettings_);
+	}
+	if (playerManager_) {
+		playerManager_->SetLightSettings(lightSettings_);
+	}
+	if (enemyManager_) {
+		enemyManager_->SetLightSettings(lightSettings_);
+	}
+	if (gridPlane_) {
+		gridPlane_->SetLightSettings(lightSettings_);
+	}
+	if (skyDome_) {
+		skyDome_->SetLightSettings(lightSettings_);
+	}
+}
+
+void DirectXGameScene::UpdatePlayerLight()
+{
+	if (!playerLightFollowsPlayer_ || !player_) {
+		return;
+	}
+
+	PointLight point = lightSettings_.GetPointLight();
+	const Vector3 playerPosition = player_->GetWorldPosition();
+	const Vector3 nextPosition{
+		playerPosition.x + playerLightOffset_.x,
+		playerPosition.y + playerLightOffset_.y,
+		playerPosition.z + playerLightOffset_.z,
+	};
+
+	const float dx = point.position.x - nextPosition.x;
+	const float dy = point.position.y - nextPosition.y;
+	const float dz = point.position.z - nextPosition.z;
+	if (dx * dx + dy * dy + dz * dz <= 0.0001f) {
+		return;
+	}
+
+	point.position = nextPosition;
+	lightSettings_.SetPointLight(point);
+	ApplyLightSettingsToWorld();
+}
+
+void DirectXGameScene::UpdateDebugCamera()
+{
+	debugCamera_.SetTranslate(debugCameraPosition_);
+	debugCamera_.SetRotate(debugCameraRotation_);
+	debugCamera_.SetFarClip(500.0f);
+	debugCamera_.Update();
+	Engine::CameraSystem::CameraManager* cameraManager = Engine::CameraSystem::CameraManager::GetInstance();
+	cameraManager->SyncCamera("directxgame_debug", &debugCamera_);
+	if (debugCameraEnabled_) {
+		cameraManager->SetActiveCamera("directxgame_debug");
 	}
 }
 
@@ -1277,6 +1523,115 @@ void DirectXGameScene::UpdateDebugUi()
 	if (ImGui::Button("Reload Debug Tuning")) {
 		LoadDebugTuning();
 		ApplyParticleBehaviorTuning();
+	}
+	if (ImGui::CollapsingHeader("Lighting / Debug Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+		bool debugCameraEnabled = debugCameraEnabled_;
+		if (ImGui::Checkbox("Use Debug Camera", &debugCameraEnabled)) {
+			debugCameraEnabled_ = debugCameraEnabled;
+			UpdateDebugCamera();
+			if (!debugCameraEnabled_) {
+				Engine::CameraSystem::CameraManager::GetInstance()->SetActiveCamera("directxgame_player");
+			}
+		}
+		float debugCameraPosition[3]{ debugCameraPosition_.x, debugCameraPosition_.y, debugCameraPosition_.z };
+		if (ImGui::DragFloat3("Debug Camera Position", debugCameraPosition, 0.5f, -220.0f, 220.0f)) {
+			debugCameraPosition_ = { debugCameraPosition[0], debugCameraPosition[1], debugCameraPosition[2] };
+			UpdateDebugCamera();
+		}
+		float debugCameraRotation[3]{ debugCameraRotation_.x, debugCameraRotation_.y, debugCameraRotation_.z };
+		if (ImGui::DragFloat3("Debug Camera Rotation", debugCameraRotation, 0.01f, -3.14f, 3.14f)) {
+			debugCameraRotation_ = { debugCameraRotation[0], debugCameraRotation[1], debugCameraRotation[2] };
+			UpdateDebugCamera();
+		}
+
+		bool lightDebugDrawEnabled = lightDebugDrawEnabled_;
+		if (ImGui::Checkbox("Draw Light Markers", &lightDebugDrawEnabled)) {
+			lightDebugDrawEnabled_ = lightDebugDrawEnabled;
+			debugDrawEnabled_ = debugDrawEnabled_ || lightDebugDrawEnabled_;
+		}
+
+		bool lightChanged = false;
+		DirectionalLight directional = lightSettings_.GetDirectionalLight();
+		bool directionalEnabled = directional.enable != 0;
+		if (ImGui::Checkbox("Directional Enabled", &directionalEnabled)) {
+			directional.enable = directionalEnabled;
+			lightChanged = true;
+		}
+		float directionalColor[3]{ directional.color.x, directional.color.y, directional.color.z };
+		if (ImGui::ColorEdit3("Directional Color", directionalColor)) {
+			directional.color = { directionalColor[0], directionalColor[1], directionalColor[2], directional.color.w };
+			lightChanged = true;
+		}
+		float directionalDirection[3]{ directional.direction.x, directional.direction.y, directional.direction.z };
+		if (ImGui::DragFloat3("Directional Direction", directionalDirection, 0.02f, -1.0f, 1.0f)) {
+			directional.direction = { directionalDirection[0], directionalDirection[1], directionalDirection[2] };
+			if (MyMath::Length(directional.direction) > 0.0001f) {
+				directional.direction = MyMath::Normalize(directional.direction);
+			}
+			lightChanged = true;
+		}
+		if (ImGui::SliderFloat("Directional Intensity", &directional.intensity, 0.0f, 4.0f)) {
+			lightChanged = true;
+		}
+
+		PointLight point = lightSettings_.GetPointLight();
+		ImGui::Separator();
+		ImGui::TextUnformatted("Player Light");
+		bool pointEnabled = point.enable != 0;
+		if (ImGui::Checkbox("Player Light Enabled", &pointEnabled)) {
+			point.enable = pointEnabled;
+			lightChanged = true;
+		}
+		if (ImGui::Checkbox("Follow Player", &playerLightFollowsPlayer_)) {
+			lightChanged = true;
+		}
+		if (ImGui::SliderFloat("Light Height", &playerLightOffset_.y, -4.0f, 40.0f)) {
+			lightChanged = true;
+		}
+		float playerLightOffsetXZ[2]{ playerLightOffset_.x, playerLightOffset_.z };
+		if (ImGui::DragFloat2("Light Offset XZ", playerLightOffsetXZ, 0.25f, -80.0f, 80.0f)) {
+			playerLightOffset_.x = playerLightOffsetXZ[0];
+			playerLightOffset_.z = playerLightOffsetXZ[1];
+			lightChanged = true;
+		}
+		float pointColor[3]{ point.color.x, point.color.y, point.color.z };
+		if (ImGui::ColorEdit3("Light Color", pointColor)) {
+			point.color = { pointColor[0], pointColor[1], pointColor[2], point.color.w };
+			lightChanged = true;
+		}
+		if (ImGui::SliderFloat("Light Intensity", &point.intensity, 0.0f, 12.0f)) {
+			lightChanged = true;
+		}
+		if (ImGui::DragFloat("Light Radius", &point.radius, 0.5f, 1.0f, 220.0f)) {
+			lightChanged = true;
+		}
+		if (ImGui::DragFloat("Light Decay", &point.decay, 0.05f, 0.1f, 8.0f)) {
+			lightChanged = true;
+		}
+		if (!playerLightFollowsPlayer_) {
+			float pointPosition[3]{ point.position.x, point.position.y, point.position.z };
+			if (ImGui::DragFloat3("Manual Light Position", pointPosition, 0.5f, -120.0f, 120.0f)) {
+				point.position = { pointPosition[0], pointPosition[1], pointPosition[2] };
+				lightChanged = true;
+			}
+		}
+		if (ImGui::Button("Apply Reference Light")) {
+			playerLightFollowsPlayer_ = true;
+			playerLightOffset_ = GameLightDefaults::kPlayerLightOffset;
+			point.color = GameLightDefaults::kPointColor;
+			point.intensity = GameLightDefaults::kPointIntensity;
+			point.radius = GameLightDefaults::kPointRadius;
+			point.decay = GameLightDefaults::kPointDecay;
+			point.enable = true;
+			lightChanged = true;
+		}
+
+		if (lightChanged) {
+			lightSettings_.SetDirectionalLight(directional);
+			lightSettings_.SetPointLight(point);
+			UpdatePlayerLight();
+			ApplyLightSettingsToWorld();
+		}
 	}
 	if (ImGui::CollapsingHeader("Audio Balance")) {
 		auto tuneVolume = [](const char* label, const char* key, float fallback) {
@@ -1475,6 +1830,9 @@ void DirectXGameScene::UpdateDebugUi()
 		ImGui::Separator();
 		ImGui::Text("Player Position: %.2f, %.2f, %.2f", position.x, position.y, position.z);
 		ImGui::Text("Player Rotation Y: %.2f", player_->GetWorldRotationY());
+		ImGui::Text(
+			"Aim Device: %s",
+			player_->GetAimInputDevice() == Player::AimInputDevice::Gamepad ? "Gamepad" : "KeyboardMouse");
 		float moveSpeed = player_->GetMoveSpeed();
 		if (ImGui::DragFloat("Move Speed", &moveSpeed, 0.1f, 1.0f, 120.0f)) {
 			player_->SetMoveSpeed(moveSpeed);
@@ -1634,7 +1992,7 @@ void DirectXGameScene::UpdateDebugUi()
 					pauseBuildLayout_.iconSize = { (std::max)(16.0f, iconSize[0]), (std::max)(16.0f, iconSize[1]) };
 					UpdatePauseBuildUi();
 				}
-				if (ImGui::Button("Save Pause Build Layout")) {
+				if (ImGui::Button("Save Pause Layout")) {
 					SavePauseBuildLayout();
 				}
 			}
